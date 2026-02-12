@@ -368,15 +368,15 @@ export default function App() {
   const handleRemoteCommand = useCallback((text, fromPeerId, charId, playerName) => {
     // __sync__ is a special signal to trigger broadcast after join
     if (text === "__sync__") return;
-    // Find the char
+    // Find the char — may be null for commands like .gen/.pick/OOC
     setChars(curChars => {
       setLog(curLog => {
         setLastRolls(curRolls => {
-          const char = curChars.find(c => c.id === charId);
-          if (!char || char.ownerId !== fromPeerId) return curRolls;
-          const charIdx = curChars.findIndex(c => c.id === charId);
-          // Process the command inline
-          processCommandFromRemote(text, char, charIdx, playerName, curChars, curLog, curRolls);
+          const char = charId ? curChars.find(c => c.id === charId) : null;
+          const charIdx = char ? curChars.findIndex(c => c.id === charId) : -1;
+          // For char-bound commands, verify ownership
+          if (char && char.ownerId !== fromPeerId) return curRolls;
+          processCommandFromRemote(text, char, charIdx, playerName, curChars, curLog, curRolls, fromPeerId);
           return curRolls;
         });
         return curLog;
@@ -461,7 +461,7 @@ export default function App() {
   }
 
   // ── Extracted command logic (shared by local + remote) ──
-  function processCommand(raw, char, charIdx, senderName) {
+  function processCommand(raw, char, charIdx, senderName, fromPeerId) {
     const cIdx = charIdx;
     const cn = char?.name || senderName;
 
@@ -493,9 +493,9 @@ export default function App() {
       const name = (pickM[2] || "").trim() || (lang === "zh" ? "\u8C03\u67E5\u5458" : "Investigator");
       const hp = Math.floor((chosen.CON + chosen.SIZ) / 10);
       const id = uid();
-      const ownerId = mp.mode === "host" ? "kp" : mp.mode === "player" ? mp.myPeerId : null;
+      const ownerId = fromPeerId || (mp.mode === "host" ? "kp" : mp.mode === "player" ? mp.myPeerId : null);
       setChars(p => [...p, { id, name, hp, hpMax: hp, san: chosen.POW, sanMax: 99, skills: { ...defaultSkills(lang) }, attrs: { ...chosen }, ownerId }]);
-      setActiveId(id);
+      if (!fromPeerId) setActiveId(id);
       setPendingSets(null);
       addLog({ type: "pick", cn: name, idx, attrs: chosen });
       addLog({ type: "sys", cn: name, text: t.lg.joined });
@@ -582,8 +582,8 @@ export default function App() {
   }
 
   // Process remote commands from players (KP side) — uses functional state access
-  function processCommandFromRemote(text, char, charIdx, playerName, curChars, curLog, curRolls) {
-    processCommand(text, char, charIdx, playerName);
+  function processCommandFromRemote(text, char, charIdx, playerName, curChars, curLog, curRolls, fromPeerId) {
+    processCommand(text, char, charIdx, playerName, fromPeerId);
   }
 
   // ── Form handler (with multiplayer routing) ──
