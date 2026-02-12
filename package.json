@@ -1,0 +1,22 @@
+{
+  "name": "coc-tool",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Call of Cthulhu 7e Session Manager — Dice roller, character tracker & session log (EN/中文)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["coc", "call-of-cthulhu", "7e", "trpg", "dice-roller"],
+  "license": "MIT",
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.5.2",
+    "vite": "^6.3.5"
+  }
+}
