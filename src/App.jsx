@@ -365,24 +365,18 @@ export default function App() {
   }, []);
 
   // ── Remote command handler (KP receives from player) ──
-  const handleRemoteCommand = useCallback((text, fromPeerId, charId, playerName) => {
-    // __sync__ is a special signal to trigger broadcast after join
+  // Ref-based pattern: stable callback reference for the hook,
+  // but always executes with latest closure (fresh pendingSets, lastRolls, lang, etc.)
+  const remoteCommandRef = useRef();
+  remoteCommandRef.current = (text, fromPeerId, charId, playerName) => {
     if (text === "__sync__") return;
-    // Find the char — may be null for commands like .gen/.pick/OOC
-    setChars(curChars => {
-      setLog(curLog => {
-        setLastRolls(curRolls => {
-          const char = charId ? curChars.find(c => c.id === charId) : null;
-          const charIdx = char ? curChars.findIndex(c => c.id === charId) : -1;
-          // For char-bound commands, verify ownership
-          if (char && char.ownerId !== fromPeerId) return curRolls;
-          processCommandFromRemote(text, char, charIdx, playerName, curChars, curLog, curRolls, fromPeerId);
-          return curRolls;
-        });
-        return curLog;
-      });
-      return curChars;
-    });
+    const char = charId ? chars.find(c => c.id === charId) : null;
+    const charIdx = char ? chars.findIndex(c => c.id === charId) : -1;
+    if (char && char.ownerId !== fromPeerId) return;
+    processCommand(text, char, charIdx, playerName, fromPeerId);
+  };
+  const handleRemoteCommand = useCallback((...args) => {
+    remoteCommandRef.current(...args);
   }, []);
 
   // ── Multiplayer hook ──
@@ -579,11 +573,6 @@ export default function App() {
     // IC message
     if (char) addLog({ type: "ic", cn: char.name, text: raw, cIdx });
     else addLog({ type: "ooc", cn: senderName || null, text: raw });
-  }
-
-  // Process remote commands from players (KP side) — uses functional state access
-  function processCommandFromRemote(text, char, charIdx, playerName, curChars, curLog, curRolls, fromPeerId) {
-    processCommand(text, char, charIdx, playerName, fromPeerId);
   }
 
   // ── Form handler (with multiplayer routing) ──
