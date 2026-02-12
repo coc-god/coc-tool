@@ -29,6 +29,7 @@ const T = {
         ".rc <skill> b2     — With 2 bonus dice",
         ".rc <skill> p1     — With 1 penalty die",
         ".push              — Push your last failed roll",
+        ".sc <s>/<f>      — SAN check (e.g. .sc 0/1d6)",
         ".hp -3  /  .hp +2  — Adjust your HP",
         ".san -5 / .san +1  — Adjust your SAN",
         ".gen <total>       — Generate 5 random attribute sets",
@@ -66,6 +67,7 @@ const T = {
       locked: "Input locked", unlocked: "Input unlocked",
       inputLocked: "Input locked by Keeper", charNotFound: "Character not found: {name}",
       sceneLabel: "Scene", kpBadge: "KP", npcBadge: "NPC", copyCode: "Copy", copied: "Copied!",
+      sanCheck: "SAN Check", sanLoss: "SAN loss", sanBadExpr: "Invalid SAN check format. Use: .sc <success>/<failure>  (e.g. .sc 0/1d6)",
     },
     connBar: {
       offline: "Offline", hosting: "Hosting", connected: "Connected",
@@ -98,6 +100,7 @@ const T = {
         ".rc <技能> b2      — 附带2个奖励骰",
         ".rc <技能> p1      — 附带1个惩罚骰",
         ".push              — 孤注一掷（上次失败的检定）",
+        ".sc <成功>/<失败> — 理智检定（如 .sc 0/1d6）",
         ".hp -3  /  .hp +2  — 调整生命值",
         ".san -5 / .san +1  — 调整理智值",
         ".gen <总数>        — 随机生成5组属性",
@@ -135,6 +138,7 @@ const T = {
       locked: "输入已锁定", unlocked: "输入已解锁",
       inputLocked: "守密人已锁定输入", charNotFound: "未找到角色：{name}",
       sceneLabel: "场景", kpBadge: "守密人", npcBadge: "NPC", copyCode: "复制", copied: "已复制！",
+      sanCheck: "理智检定", sanLoss: "理智损失", sanBadExpr: "无效的理智检定格式。用法：.sc <成功>/<失败>（如 .sc 0/1d6）",
     },
     connBar: {
       offline: "离线", hosting: "主持中", connected: "已连接",
@@ -243,6 +247,25 @@ const LS = {
   FAILURE:  { c: "#8a6a5a", bg: "rgba(138,106,90,0.06)", i: "✕" },
   FUMBLE:   { c: "#c83a3a", bg: "rgba(200,58,58,0.10)", i: "☠" },
 };
+
+/* ═══════════ Dice expression ═══════════ */
+function rollDiceExpr(expr) {
+  const s = expr.trim();
+  if (/^\d+$/.test(s)) return { total: parseInt(s, 10), text: s };
+  const m = s.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
+  if (!m) return null;
+  const n = parseInt(m[1] || "1", 10);
+  const sides = parseInt(m[2], 10);
+  const mod = m[3] ? parseInt(m[3], 10) : 0;
+  let sum = 0;
+  const rolls = [];
+  for (let i = 0; i < n; i++) { const r = Math.floor(Math.random() * sides) + 1; rolls.push(r); sum += r; }
+  sum += mod;
+  if (sum < 0) sum = 0;
+  const modStr = mod > 0 ? `+${mod}` : mod < 0 ? `${mod}` : "";
+  const text = n === 1 && !mod ? `${rolls[0]}` : `[${rolls.join("+")}${modStr}]=${sum}`;
+  return { total: sum, text };
+}
 
 let _id = Date.now();
 function uid() { return String(++_id); }
@@ -557,6 +580,48 @@ export default function App() {
       return;
     }
 
+    // .sc <success>/<failure>  — SAN check
+    const scM = raw.match(/^\.sc\s+(\S+)\s*\/\s*(\S+)$/i);
+    if (scM && char) {
+      const succExpr = scM[1];
+      const failExpr = scM[2];
+      // Validate expressions
+      const testSucc = rollDiceExpr(succExpr);
+      const testFail = rollDiceExpr(failExpr);
+      if (!testSucc || !testFail) { addLog({ type: "err", cn: char.name, text: t.lg.sanBadExpr, cIdx }); return; }
+
+      // Roll vs current SAN
+      const sanVal = char.san;
+      const roll = resolveRoll(0);
+      const passed = roll.result <= sanVal;
+      const level = getLevel(roll.result, sanVal);
+
+      // Roll the loss amount
+      const lossRoll = passed ? rollDiceExpr(succExpr) : rollDiceExpr(failExpr);
+      const loss = lossRoll.total;
+
+      // Apply SAN loss
+      if (loss > 0) {
+        setChars(p => p.map(c => {
+          if (c.id !== char.id) return c;
+          const nv = Math.max(0, c.san - loss);
+          return { ...c, san: nv };
+        }));
+      }
+
+      const newSan = Math.max(0, char.san - loss);
+      const lossLabel = `${t.lg.sanLoss}: ${lossRoll.text}`;
+      const sanChange = loss > 0 ? ` | SAN ${char.san} ${t.lg.a} ${newSan} (-${loss})` : "";
+
+      addLog({
+        type: "roll", cn: char.name, cIdx,
+        text: `${t.lg.sanCheck} [${sanVal}] (${succExpr}/${failExpr}): `,
+        roll: { ...roll, level },
+        suffix: ` \u2014 ${LS[level].i} ${t.lv[level]} | ${lossLabel}${sanChange}`,
+      });
+      return;
+    }
+
     // .rc <skill_or_number> [b<n>|p<n>]
     const rm = raw.match(/^\.rc\s+(.+?)(?:\s+([bp])(\d+))?$/i);
     if (rm && char) {
@@ -605,7 +670,7 @@ export default function App() {
 
     // IC message / narration
     if (char) addLog({ type: "ic", cn: char.name, text: raw, cIdx });
-    else addLog({ type: "ic", cn: senderName || (lang === "zh" ? "\u5B88\u5BC6\u4EBA" : "Keeper"), text: raw });
+    else addLog({ type: "ic", cn: senderName || (lang === "zh" ? "KP" : "Keeper"), text: raw });
   }
 
   // ── Form handler (with multiplayer routing) ──
@@ -677,7 +742,7 @@ export default function App() {
     // Connection commands
     const hostM = raw.match(/^\.host(?:\s+(.+))?$/i);
     if (hostM) {
-      const name = (hostM[1] || "").trim() || (lang === "zh" ? "\u5B88\u5BC6\u4EBA" : "Keeper");
+      const name = (hostM[1] || "").trim() || (lang === "zh" ? "KP" : "Keeper");
       setDisplayName(name);
       mp.host(name);
       return;
@@ -1080,9 +1145,23 @@ export default function App() {
                 : mp.mode === "host"
                   ? chars.filter(c => !c.ownerId || c.ownerId === "kp")
                   : chars;
-              return pickable.length > 0 && (
+              const isHost = mp.mode === "host";
+              return (pickable.length > 0 || isHost) && (
               <div style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", background: P.s1, borderBottom: `1px solid ${P.b}`, flexShrink: 0 }}>
                 <span style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif", marginRight: 2 }}>{t.sp.pickChar}:</span>
+                {isHost && (
+                  <button onClick={() => { setActiveId(null); inputRef.current?.focus(); }}
+                    style={{
+                      ...bt, padding: "3px 9px", fontSize: 11,
+                      background: !active ? `${P.ac}15` : P.s2,
+                      border: `1px solid ${!active ? P.ac + "55" : P.b}`,
+                      color: !active ? P.ac : P.t,
+                      display: "flex", alignItems: "center", gap: 4,
+                    }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: P.ac, flexShrink: 0 }} />
+                    {displayName || (lang === "zh" ? "KP" : "Keeper")}
+                  </button>
+                )}
                 {pickable.map((c) => {
                   const ci = chars.indexOf(c);
                   return (
@@ -1294,7 +1373,7 @@ export default function App() {
                 {(active || mp.mode === "host") && (
                   <span style={{ display: "flex", alignItems: "center", padding: "0 8px", fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, color: active ? cc(aIdx) : P.ac, whiteSpace: "nowrap" }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: active ? cc(aIdx) : P.ac, marginRight: 5 }} />
-                    {active ? active.name : (displayName || (lang === "zh" ? "\u5B88\u5BC6\u4EBA" : "Keeper"))}
+                    {active ? active.name : (displayName || (lang === "zh" ? "KP" : "Keeper"))}
                   </span>
                 )}
                 <input ref={inputRef} value={logIn} onChange={e => setLogIn(e.target.value)} placeholder={t.sp.inputPh}
