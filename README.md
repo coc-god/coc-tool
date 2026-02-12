@@ -1,39 +1,47 @@
-# 🐙 CoC 7e Session Manager / 克苏鲁的呼唤 7版 场景管理器
+# 🐙 CoC 7e Session Playground / 克苏鲁的呼唤 7版 跑团场景
 
-A browser-based session management tool for **Call of Cthulhu 7th Edition** TRPG, with full English and Chinese (中文) support.
+A chat-driven session playground for **Call of Cthulhu 7th Edition** TRPG. Players pick characters, type commands to roll dice, and play through a shared session log. Full English and Chinese (中文) support.
 
-一个基于浏览器的**克苏鲁的呼唤第七版** TRPG 场景管理工具，支持中英文切换。
+一个基于聊天指令的**克苏鲁的呼唤第七版** TRPG 跑团工具。玩家选择角色，通过输入指令掷骰，在共享的场景日志中进行游戏。支持中英文切换。
 
 ## Features / 功能
 
-### 🎲 Dice Roller / 骰子
-- d100 percentile roll with animated dice
-- Bonus & Penalty dice (up to ±3) — shows all tens dice, highlights chosen
-- Success levels: Critical (01) · Extreme (≤ skill/5) · Hard (≤ skill/2) · Regular (≤ skill) · Failure · Fumble
-- **Pushed rolls** — available after failure, with ominous consequences
-- Roll against any character skill or a custom target value
+### 🎲 Command-Driven Play / 指令驱动
+Everything happens in the session chat. Type commands to roll, adjust stats, or talk in/out of character:
+
+| Command | Effect |
+|---|---|
+| `.rc <skill>` | Roll skill check (e.g. `.rc Spot Hidden` / `.rc 侦查`) |
+| `.rc <number>` | Roll against custom value (e.g. `.rc 65`) |
+| `.rc <skill> b2` | Roll with 2 bonus dice |
+| `.rc <skill> p1` | Roll with 1 penalty die |
+| `.push` | Push your last failed roll (孤注一掷) |
+| `.hp -3` / `.hp +2` | Adjust your HP |
+| `.san -5` / `.san +1` | Adjust your SAN |
+| `.help` | Show command reference |
+| `(text)` | Out-of-character comment (OOC / 题外话) |
+| anything else | In-character message / narration |
+
+Dice rolls show inline tens + units dice with bonus/penalty dice visible, success thresholds `[regular/hard/extreme]`, and color-coded results.
 
 ### 👤 Characters / 角色管理
 - Create investigators with name, HP, SAN, and skills
-- 15 pre-populated common CoC 7e skills (侦查, 聆听, 急救, etc.)
+- 15 pre-populated common CoC 7e skills
 - Add/remove custom skills
-- HP and SAN bars with +/− adjustment, every change logged
-- Click to set active investigator for dice rolling
+- Each character gets a unique color in the session log
+- Switch active character with one click
 
-### 📜 Session Log / 日志
-- Chronological log of all events: dice rolls, HP/SAN changes, skill edits, system messages
-- **OOC comments** — type `(` to start an out-of-character message
-- Color-coded entries by event type
-- Export log as `.txt` file
-- Clear log with confirmation
+### 📜 Session Log / 场景日志
+- All events in one chronological feed: 🎲 rolls, 🗣️ IC dialogue, 💬 OOC, ❤️ HP, 🧠 SAN, 📖 skill changes
+- Color-coded per character and event type
+- Export as `.txt`, clear with confirmation
+- Up to 500 entries persisted
 
 ### 🌐 Bilingual / 双语
-- Toggle EN ↔ 中文 in the header
-- All UI labels, skill names, and log entries switch language
+- Toggle EN ↔ 中文 — all UI, skills, and log entries switch
 
 ### 💾 Persistence / 数据持久化
 - All data saved to `localStorage` — survives page refresh
-- Up to 500 log entries retained
 
 ## Getting Started / 开始使用
 

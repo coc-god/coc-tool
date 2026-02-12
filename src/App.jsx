@@ -3,82 +3,95 @@ import { useState, useEffect, useRef, useCallback } from "react";
 /* ═══════════ i18n ═══════════ */
 const T = {
   en: {
-    title: "Call of Cthulhu 7e", subtitle: "Session Manager",
+    title: "Call of Cthulhu 7e", subtitle: "Session Playground",
     langSwitch: "中文",
-    tabs: { chars: "Characters", dice: "Dice", log: "Log" },
+    tabs: { chars: "Characters", session: "Session" },
     cp: {
-      add: "+ New Investigator", none: "No investigators yet.",
+      add: "+ New Investigator", none: "No investigators yet. Create one to begin.",
       name: "Name", hp: "HP", san: "SAN", skills: "Skills",
       addSkill: "+ Skill", save: "Save", cancel: "Cancel",
       del: "Delete", edit: "Edit", confirmDel: "Remove this investigator?",
       max: "max",
     },
-    dp: {
-      pickChar: "Select an investigator on the Characters tab first.",
-      pickSkill: "Choose a skill to roll against",
-      custom: "Custom", value: "Target",
-      bonus: "Bonus", penalty: "Penalty",
-      roll: "Roll d100", push: "Push the Roll",
-      pushWarn: "Failure will be catastrophic…",
-      newRoll: "New Roll",
+    sp: {
+      pickChar: "Pick your investigator",
+      inputPh: "Type a message or command (.help for list)",
+      noChars: "Create investigators on the Characters tab first.",
+      empty: "Session hasn't started yet. Pick a character and type something!",
+      export: "Export", clear: "Clear", clearConfirm: "Clear all session log?",
+    },
+    help: {
+      title: "── Commands ──",
+      lines: [
+        ".rc <skill>        — Skill check  (e.g. .rc Spot Hidden)",
+        ".rc <number>       — Custom check  (e.g. .rc 65)",
+        ".rc <skill> b2     — With 2 bonus dice",
+        ".rc <skill> p1     — With 1 penalty die",
+        ".push              — Push your last failed roll",
+        ".hp -3  /  .hp +2  — Adjust your HP",
+        ".san -5 / .san +1  — Adjust your SAN",
+        "(text)             — Out-of-character comment",
+        "anything else      — In-character message",
+      ],
     },
     lv: {
       CRITICAL: "Critical!", EXTREME: "Extreme Success",
       HARD: "Hard Success", REGULAR: "Regular Success",
       FAILURE: "Failure", FUMBLE: "Fumble!",
     },
-    lp: {
-      placeholder: "Type message… ( prefix = OOC",
-      empty: "Session log is empty.", export: "Export", clear: "Clear",
-      clearConfirm: "Clear all log entries?",
-    },
     lg: {
-      rolled: "rolled", push: "(Pushed)",
+      rolled: "rolled", push: "(Pushed)", vs: "vs",
       joined: "joined the session", removed: "left the session",
-      a: "→", rolling: "Rolling…",
-      regular: "Regular", hard: "Hard", extreme: "Extreme",
+      a: "→", noSkill: "Skill not found", noChar: "Select a character first",
+      pushFail: "Nothing to push", pushNone: "No previous failed roll to push",
     },
   },
   zh: {
-    title: "克苏鲁的呼唤 7版", subtitle: "场景管理器",
+    title: "克苏鲁的呼唤 7版", subtitle: "跑团场景",
     langSwitch: "EN",
-    tabs: { chars: "角色", dice: "骰子", log: "日志" },
+    tabs: { chars: "角色", session: "跑团" },
     cp: {
-      add: "+ 新调查员", none: "暂无调查员。",
+      add: "+ 新调查员", none: "暂无调查员，请先创建角色。",
       name: "姓名", hp: "生命值", san: "理智值", skills: "技能",
       addSkill: "+ 技能", save: "保存", cancel: "取消",
       del: "删除", edit: "编辑", confirmDel: "确定移除此调查员？",
       max: "上限",
     },
-    dp: {
-      pickChar: "请先在角色页选择一名调查员。",
-      pickSkill: "选择要检定的技能",
-      custom: "自定义", value: "目标值",
-      bonus: "奖励骰", penalty: "惩罚骰",
-      roll: "掷 d100", push: "孤注一掷",
-      pushWarn: "失败将带来灾难性后果……",
-      newRoll: "新检定",
+    sp: {
+      pickChar: "选择你的调查员",
+      inputPh: "输入消息或指令（.help 查看列表）",
+      noChars: "请先在角色页创建调查员。",
+      empty: "场景尚未开始。选择角色后输入内容吧！",
+      export: "导出", clear: "清空", clearConfirm: "确定清空所有日志？",
+    },
+    help: {
+      title: "── 指令列表 ──",
+      lines: [
+        ".rc <技能>         — 技能检定（如 .rc 侦查）",
+        ".rc <数字>         — 自定义检定（如 .rc 65）",
+        ".rc <技能> b2      — 附带2个奖励骰",
+        ".rc <技能> p1      — 附带1个惩罚骰",
+        ".push              — 孤注一掷（上次失败的检定）",
+        ".hp -3  /  .hp +2  — 调整生命值",
+        ".san -5 / .san +1  — 调整理智值",
+        "(文字)             — 题外话 / OOC",
+        "其他文字            — 角色扮演 / 叙述",
+      ],
     },
     lv: {
       CRITICAL: "大成功！", EXTREME: "极难成功",
       HARD: "困难成功", REGULAR: "成功",
       FAILURE: "失败", FUMBLE: "大失败！",
     },
-    lp: {
-      placeholder: "输入消息…… ( 开头 = 题外话",
-      empty: "日志为空。", export: "导出", clear: "清空",
-      clearConfirm: "确定清空所有日志？",
-    },
     lg: {
-      rolled: "检定", push: "(孤注一掷)",
+      rolled: "检定", push: "(孤注一掷)", vs: "对抗",
       joined: "加入了场景", removed: "离开了场景",
-      a: "→", rolling: "掷骰中……",
-      regular: "常规", hard: "困难", extreme: "极难",
+      a: "→", noSkill: "未找到该技能", noChar: "请先选择角色",
+      pushFail: "没有可孤注一掷的检定", pushNone: "没有上次失败的检定可以孤注一掷",
     },
   },
 };
 
-/* ═══════════ Default Skills ═══════════ */
 const SKILL_DEFAULTS = [
   { en: "Spot Hidden", zh: "侦查", v: 25 },
   { en: "Listen", zh: "聆听", v: 20 },
@@ -96,16 +109,14 @@ const SKILL_DEFAULTS = [
   { en: "Climb", zh: "攀爬", v: 20 },
   { en: "Swim", zh: "游泳", v: 20 },
 ];
-
 function defaultSkills(lang) {
   const o = {};
   SKILL_DEFAULTS.forEach(s => { o[s[lang]] = s.v; });
   return o;
 }
 
-/* ═══════════ Dice Logic ═══════════ */
+/* ═══════════ Dice ═══════════ */
 function rD10() { return Math.floor(Math.random() * 10); }
-
 function resolveRoll(bp) {
   const units = rD10();
   const n = Math.abs(bp);
@@ -119,7 +130,6 @@ function resolveRoll(bp) {
   if (result === 0) result = 100;
   return { result, units, tens, chosen };
 }
-
 function getLevel(roll, skill) {
   if (roll === 1) return "CRITICAL";
   if (roll === 100) return "FUMBLE";
@@ -131,91 +141,93 @@ function getLevel(roll, skill) {
 }
 
 const LS = {
-  CRITICAL: { c: "#d4aa3e", bg: "rgba(212,170,62,0.13)", i: "✦" },
-  EXTREME:  { c: "#6aaa5a", bg: "rgba(106,170,90,0.10)", i: "◆" },
-  HARD:     { c: "#5a8abb", bg: "rgba(90,138,187,0.10)", i: "◇" },
-  REGULAR:  { c: "#9a9a88", bg: "rgba(154,154,136,0.08)", i: "●" },
-  FAILURE:  { c: "#8a6a5a", bg: "rgba(138,106,90,0.08)", i: "✕" },
-  FUMBLE:   { c: "#c83a3a", bg: "rgba(200,58,58,0.14)", i: "☠" },
+  CRITICAL: { c: "#d4aa3e", bg: "rgba(212,170,62,0.10)", i: "✦" },
+  EXTREME:  { c: "#6aaa5a", bg: "rgba(106,170,90,0.08)", i: "◆" },
+  HARD:     { c: "#5a8abb", bg: "rgba(90,138,187,0.08)", i: "◇" },
+  REGULAR:  { c: "#9a9a88", bg: "rgba(154,154,136,0.06)", i: "●" },
+  FAILURE:  { c: "#8a6a5a", bg: "rgba(138,106,90,0.06)", i: "✕" },
+  FUMBLE:   { c: "#c83a3a", bg: "rgba(200,58,58,0.10)", i: "☠" },
 };
 
 let _id = Date.now();
 function uid() { return String(++_id); }
 function now() { return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
 
-/* ═══════════ Storage (localStorage) ═══════════ */
-const STORAGE_KEY = "coc7e-session";
-
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveData(data) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
-}
+/* ═══════════ Storage ═══════════ */
+const SK = "coc7e-playground";
+function ld() { try { return JSON.parse(localStorage.getItem(SK)); } catch { return null; } }
+function sv(d) { try { localStorage.setItem(SK, JSON.stringify(d)); } catch {} }
 
 /* ═══════════ Theme ═══════════ */
 const P = {
-  bg: "#0d0d0b", s1: "#151513", s2: "#1b1b18",
-  b: "#292924", bl: "#3a3a32",
-  t: "#c8bfa0", td: "#706b5c", tb: "#e0d8c0",
+  bg: "#0d0d0b", s1: "#141412", s2: "#1a1a17",
+  b: "#282824", bl: "#383832",
+  t: "#c8bfa0", td: "#6a6558", tb: "#e0d8c0",
   ac: "#c9a84c", acd: "#8a7a3a",
   r: "#a84040", g: "#5a8a50", bl2: "#5a7a9a",
 };
-
 const inp = {
   background: P.s1, border: `1px solid ${P.b}`, borderRadius: 6,
   color: P.t, padding: "6px 10px", fontFamily: "'Crimson Text',serif",
   fontSize: 15, outline: "none", width: "100%", boxSizing: "border-box",
 };
-const btn = {
+const bt = {
   background: P.s2, border: `1px solid ${P.b}`, borderRadius: 6,
   color: P.t, padding: "7px 14px", fontFamily: "'Cinzel',serif",
-  fontSize: 13, cursor: "pointer", transition: "all 0.15s",
-  letterSpacing: "0.03em",
+  fontSize: 13, cursor: "pointer", transition: "all 0.15s", letterSpacing: "0.03em",
 };
-const abtn = {
-  ...btn, background: "linear-gradient(145deg,#2a2518,#1e1a10)",
+const abt = {
+  ...bt, background: "linear-gradient(145deg,#2a2518,#1e1a10)",
   border: `1px solid ${P.acd}`, color: P.ac,
 };
 
-/* ═══════════ Sub-components ═══════════ */
-function Die({ value, isTens, chosen, size = 56 }) {
-  const txt = isTens ? (value === 0 ? "00" : String(value * 10)) : String(value);
-  const on = chosen === undefined || chosen === true;
+const CCOLS = ["#c9a84c","#6aaa8a","#aa6a8a","#7a9aca","#ca8a4a","#8a6aca","#5aba7a","#ca5a5a"];
+function cc(i) { return CCOLS[i % CCOLS.length]; }
+
+/* ═══════════ Inline Dice ═══════════ */
+function DiceInline({ tens, chosen, units }) {
   return (
-    <div style={{
-      width: size, height: size, display: "flex", alignItems: "center", justifyContent: "center",
-      background: on ? "linear-gradient(145deg,#1d1d1a,#27271f)" : "#131311",
-      border: `1.5px solid ${chosen === true ? P.acd : chosen === false ? "#222" : P.b}`,
-      borderRadius: 8, fontFamily: "'Cinzel',serif", fontSize: size * .36, fontWeight: 700,
-      color: on ? P.tb : "#444", opacity: chosen === false ? .4 : 1,
-      transition: "all 0.3s", boxShadow: chosen === true ? `0 0 10px rgba(201,168,76,.12)` : "none",
-    }}>{txt}</div>
+    <span style={{ display: "inline-flex", gap: 3, alignItems: "center", verticalAlign: "middle", margin: "0 4px" }}>
+      {tens.map((v, i) => {
+        const on = tens.length > 1 ? (i === tens.indexOf(chosen) && v === chosen) : true;
+        return (
+          <span key={i} style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: 28, height: 22, borderRadius: 4, fontSize: 11, fontWeight: 700,
+            fontFamily: "'Cinzel',serif",
+            background: on ? "rgba(201,168,76,0.15)" : "rgba(80,80,70,0.2)",
+            border: `1px solid ${on ? "rgba(201,168,76,0.4)" : "rgba(80,80,70,0.3)"}`,
+            color: on ? P.ac : "#555", opacity: on ? 1 : 0.5,
+          }}>{v === 0 ? "00" : v * 10}</span>
+        );
+      })}
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 22, height: 22, borderRadius: 4, fontSize: 11, fontWeight: 700,
+        fontFamily: "'Cinzel',serif",
+        background: "rgba(180,170,140,0.1)", border: "1px solid rgba(180,170,140,0.25)", color: P.tb,
+      }}>{units}</span>
+    </span>
   );
 }
 
+/* ═══════════ Stat Bar ═══════════ */
 function Bar({ label, cur, max, color, onAdj }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
       <span style={{ fontFamily: "'Cinzel',serif", fontSize: 11, color: P.td, width: 30, textAlign: "right" }}>{label}</span>
-      <button onClick={() => onAdj(-1)} style={{ ...btn, padding: "1px 7px", fontSize: 14, borderRadius: 4, lineHeight: 1 }}>−</button>
+      <button onClick={() => onAdj(-1)} style={{ ...bt, padding: "1px 7px", fontSize: 14, borderRadius: 4, lineHeight: 1 }}>−</button>
       <div style={{ flex: 1, height: 18, background: P.s1, borderRadius: 9, border: `1px solid ${P.b}`, overflow: "hidden", position: "relative" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg,${color}77,${color})`, borderRadius: 9, transition: "width 0.4s" }} />
-        <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: "'Cinzel',serif", color: P.tb, textShadow: "0 1px 3px #000" }}>
-          {cur}/{max}
-        </span>
+        <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: "'Cinzel',serif", color: P.tb, textShadow: "0 1px 3px #000" }}>{cur}/{max}</span>
       </div>
-      <button onClick={() => onAdj(1)} style={{ ...btn, padding: "1px 7px", fontSize: 14, borderRadius: 4, lineHeight: 1 }}>+</button>
+      <button onClick={() => onAdj(1)} style={{ ...bt, padding: "1px 7px", fontSize: 14, borderRadius: 4, lineHeight: 1 }}>+</button>
     </div>
   );
 }
 
-/* ═══════════════════ MAIN APP ═══════════════════ */
+/* ═════════════════════ MAIN ═════════════════════ */
 export default function App() {
   const [lang, setLang] = useState("en");
   const [tab, setTab] = useState("chars");
@@ -223,245 +235,196 @@ export default function App() {
   const [activeId, setActiveId] = useState(null);
   const [log, setLog] = useState([]);
   const [loaded, setLoaded] = useState(false);
-
-  // Dice
-  const [selSkill, setSelSkill] = useState(null);
-  const [customVal, setCustomVal] = useState(50);
-  const [bp, setBp] = useState(0);
-  const [rollRes, setRollRes] = useState(null);
-  const [rolling, setRolling] = useState(false);
-  const [pushed, setPushed] = useState(false);
-  const [animDice, setAnimDice] = useState(null);
-  const animRef = useRef(null);
-
-  // Char form
-  const [editing, setEditing] = useState(null);
-  const [fn, setFn] = useState("");
-  const [fhp, setFhp] = useState(10); const [fhpM, setFhpM] = useState(10);
-  const [fsan, setFsan] = useState(50); const [fsanM, setFsanM] = useState(99);
-  const [fsk, setFsk] = useState({});
-  const [nsn, setNsn] = useState(""); const [nsv, setNsv] = useState(10);
-
   const [logIn, setLogIn] = useState("");
+  const [lastRolls, setLastRolls] = useState({});
+
+  const [editing, setEditing] = useState(null);
+  const [fn, setFn] = useState(""); const [fhp, setFhp] = useState(10); const [fhpM, setFhpM] = useState(10);
+  const [fsan, setFsan] = useState(50); const [fsanM, setFsanM] = useState(99);
+  const [fsk, setFsk] = useState({}); const [nsn, setNsn] = useState(""); const [nsv, setNsv] = useState(10);
+
   const logEnd = useRef(null);
+  const inputRef = useRef(null);
   const t = T[lang];
   const active = chars.find(c => c.id === activeId) || null;
+  const aIdx = chars.findIndex(c => c.id === activeId);
 
-  // ── Load from localStorage ──
-  useEffect(() => {
-    const d = loadData();
-    if (d) {
-      if (d.chars) setChars(d.chars);
-      if (d.log) setLog(d.log);
-      if (d.activeId) setActiveId(d.activeId);
-      if (d.lang) setLang(d.lang);
-    }
-    setLoaded(true);
-  }, []);
-
-  // ── Save (debounced) ──
-  useEffect(() => {
-    if (!loaded) return;
-    const h = setTimeout(() => saveData({ chars, log: log.slice(-500), activeId, lang }), 400);
-    return () => clearTimeout(h);
-  }, [chars, log, activeId, lang, loaded]);
-
-  // ── Logging ──
-  const addLog = useCallback((type, cn, text, detail = null) => {
-    setLog(prev => [...prev, { id: uid(), time: now(), type, cn, text, detail }]);
-  }, []);
+  useEffect(() => { const d = ld(); if (d) { d.chars && setChars(d.chars); d.log && setLog(d.log); d.activeId && setActiveId(d.activeId); d.lang && setLang(d.lang); d.lastRolls && setLastRolls(d.lastRolls); } setLoaded(true); }, []);
+  useEffect(() => { if (!loaded) return; const h = setTimeout(() => sv({ chars, log: log.slice(-500), activeId, lang, lastRolls }), 400); return () => clearTimeout(h); }, [chars, log, activeId, lang, lastRolls, loaded]);
   useEffect(() => { logEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [log]);
 
+  const addLog = useCallback((e) => setLog(prev => [...prev, { id: uid(), time: now(), ...e }]), []);
+
   // ── Char ops ──
-  function startNew() {
-    setEditing("new"); setFn(""); setFhp(10); setFhpM(10); setFsan(50); setFsanM(99);
-    setFsk({ ...defaultSkills(lang) });
-  }
-  function startEdit(c) {
-    setEditing(c.id); setFn(c.name); setFhp(c.hp); setFhpM(c.hpMax);
-    setFsan(c.san); setFsanM(c.sanMax); setFsk({ ...c.skills });
-  }
+  function startNew() { setEditing("new"); setFn(""); setFhp(10); setFhpM(10); setFsan(50); setFsanM(99); setFsk({ ...defaultSkills(lang) }); }
+  function startEdit(c) { setEditing(c.id); setFn(c.name); setFhp(c.hp); setFhpM(c.hpMax); setFsan(c.san); setFsanM(c.sanMax); setFsk({ ...c.skills }); }
   function saveChar() {
     if (!fn.trim()) return;
     if (editing === "new") {
       const id = uid();
       setChars(p => [...p, { id, name: fn.trim(), hp: fhp, hpMax: fhpM, san: fsan, sanMax: fsanM, skills: { ...fsk } }]);
       setActiveId(id);
-      addLog("sys", fn.trim(), t.lg.joined);
+      addLog({ type: "sys", cn: fn.trim(), text: t.lg.joined });
     } else {
       setChars(p => p.map(c => {
         if (c.id !== editing) return c;
-        Object.keys(fsk).forEach(sk => {
-          if (c.skills[sk] !== undefined && c.skills[sk] !== fsk[sk])
-            addLog("skill", c.name, `${sk} ${c.skills[sk]} ${t.lg.a} ${fsk[sk]}`);
-        });
-        if (c.hp !== fhp || c.hpMax !== fhpM)
-          addLog("hp", c.name, `HP ${c.hp}/${c.hpMax} ${t.lg.a} ${fhp}/${fhpM}`);
-        if (c.san !== fsan || c.sanMax !== fsanM)
-          addLog("san", c.name, `SAN ${c.san}/${c.sanMax} ${t.lg.a} ${fsan}/${fsanM}`);
+        Object.keys(fsk).forEach(sk => { if (c.skills[sk] !== undefined && c.skills[sk] !== fsk[sk]) addLog({ type: "skill", cn: c.name, text: `${sk} ${c.skills[sk]} ${t.lg.a} ${fsk[sk]}`, cIdx: chars.findIndex(x => x.id === c.id) }); });
+        if (c.hp !== fhp || c.hpMax !== fhpM) addLog({ type: "hp", cn: c.name, text: `HP ${c.hp}/${c.hpMax} ${t.lg.a} ${fhp}/${fhpM}`, cIdx: chars.findIndex(x => x.id === c.id) });
+        if (c.san !== fsan || c.sanMax !== fsanM) addLog({ type: "san", cn: c.name, text: `SAN ${c.san}/${c.sanMax} ${t.lg.a} ${fsan}/${fsanM}`, cIdx: chars.findIndex(x => x.id === c.id) });
         return { ...c, name: fn.trim(), hp: fhp, hpMax: fhpM, san: fsan, sanMax: fsanM, skills: { ...fsk } };
       }));
     }
     setEditing(null);
   }
-  function delChar(id) {
-    if (!window.confirm(t.cp.confirmDel)) return;
-    const c = chars.find(x => x.id === id);
-    if (c) addLog("sys", c.name, t.lg.removed);
-    setChars(p => p.filter(x => x.id !== id));
-    if (activeId === id) setActiveId(null);
-    setEditing(null);
-  }
+  function delChar(id) { if (!window.confirm(t.cp.confirmDel)) return; const c = chars.find(x => x.id === id); if (c) addLog({ type: "sys", cn: c.name, text: t.lg.removed }); setChars(p => p.filter(x => x.id !== id)); if (activeId === id) setActiveId(null); setEditing(null); }
   function adjStat(cid, stat, d) {
     setChars(p => p.map(c => {
       if (c.id !== cid) return c;
       const nv = Math.max(0, Math.min(c[stat + "Max"], c[stat] + d));
-      if (nv !== c[stat])
-        addLog(stat === "hp" ? "hp" : "san", c.name, `${stat.toUpperCase()} ${c[stat]} ${t.lg.a} ${nv} (${d > 0 ? "+" : ""}${d})`);
+      if (nv !== c[stat]) addLog({ type: stat === "hp" ? "hp" : "san", cn: c.name, text: `${stat.toUpperCase()} ${c[stat]} ${t.lg.a} ${nv} (${d > 0 ? "+" : ""}${d})`, cIdx: chars.findIndex(x => x.id === cid) });
       return { ...c, [stat]: nv };
     }));
   }
 
-  // ── Dice ──
-  function doRoll(isPush = false) {
-    if (!active || !selSkill) return;
-    const sv = selSkill === "__custom__" ? customVal : (active.skills[selSkill] ?? 50);
-    const sn = selSkill === "__custom__" ? (lang === "zh" ? "自定义" : "Custom") : selSkill;
-    setRolling(true);
-    if (isPush) setPushed(true);
-    let frame = 0;
-    if (animRef.current) clearInterval(animRef.current);
-    animRef.current = setInterval(() => {
-      frame++;
-      const n = Math.abs(bp);
-      const ft = []; for (let i = 0; i <= n; i++) ft.push(rD10());
-      setAnimDice({ units: rD10(), tens: ft });
-      if (frame >= 14) {
-        clearInterval(animRef.current);
-        const roll = resolveRoll(bp);
-        const level = getLevel(roll.result, sv);
-        const res = { ...roll, level, sv, sn, isPush };
-        setRollRes(res); setAnimDice(null); setRolling(false);
-        const pt = isPush ? ` ${t.lg.push}` : "";
-        const levelText = t.lv[level];
-        addLog("roll", active.name,
-          `${t.lg.rolled} ${sn}(${sv}): ${roll.result} — ${levelText}${pt}`,
-          { roll: roll.result, skill: sv, sn, level, isPush, tens: roll.tens, chosen: roll.chosen, units: roll.units, bp });
-      }
-    }, 50);
-  }
-  function resetRoll() { setRollRes(null); setPushed(false); setAnimDice(null); }
-  const canPush = rollRes && !pushed && rollRes.level === "FAILURE";
-
-  // ── Log input ──
-  function handleLogSub(e) {
+  // ── Command handler ──
+  function handleSubmit(e) {
     e.preventDefault();
-    if (!logIn.trim()) return;
-    if (logIn.trim().startsWith("(")) addLog("ooc", null, logIn.trim());
-    else addLog("msg", active?.name || null, logIn.trim());
+    const raw = logIn.trim();
+    if (!raw) return;
     setLogIn("");
+
+    // OOC
+    if (raw.startsWith("(")) { addLog({ type: "ooc", cn: active?.name || null, text: raw, cIdx: aIdx }); return; }
+    // .help
+    if (raw.toLowerCase() === ".help") { addLog({ type: "help", text: t.help.title + "\n" + t.help.lines.join("\n") }); return; }
+    // Need char for commands
+    if (raw.startsWith(".") && !active) { addLog({ type: "err", text: t.lg.noChar }); return; }
+
+    // .hp / .san
+    const sm = raw.match(/^\.(hp|san)\s+([+-]?\d+)$/i);
+    if (sm && active) { adjStat(active.id, sm[1].toLowerCase(), parseInt(sm[2], 10)); return; }
+
+    // .push
+    if (raw.toLowerCase() === ".push" && active) {
+      const lr = lastRolls[active.id];
+      if (!lr || lr.level !== "FAILURE") { addLog({ type: "err", cn: active.name, text: t.lg.pushNone, cIdx: aIdx }); return; }
+      const roll = resolveRoll(lr.bp);
+      const level = getLevel(roll.result, lr.sv);
+      setLastRolls(prev => ({ ...prev, [active.id]: { ...lr, level, pushed: true } }));
+      addLog({ type: "roll", cn: active.name, cIdx: aIdx, text: `${t.lg.rolled} ${lr.sn}(${lr.sv}): `, roll: { ...roll, level }, suffix: ` — ${LS[level].i} ${t.lv[level]} ${t.lg.push}` });
+      return;
+    }
+
+    // .rc <skill_or_number> [b<n>|p<n>]
+    const rm = raw.match(/^\.rc\s+(.+?)(?:\s+([bp])(\d+))?$/i);
+    if (rm && active) {
+      const target = rm[1].trim();
+      const bpType = rm[2]?.toLowerCase();
+      const bpN = rm[3] ? Math.min(3, parseInt(rm[3], 10)) : 0;
+      const bp = bpType === "b" ? bpN : bpType === "p" ? -bpN : 0;
+
+      let skillVal, skillName;
+      if (/^\d+$/.test(target)) {
+        skillVal = Math.max(1, Math.min(100, parseInt(target, 10)));
+        skillName = lang === "zh" ? "自定义" : "Custom";
+      } else {
+        const key = Object.keys(active.skills).find(k => k.toLowerCase() === target.toLowerCase());
+        if (!key) { addLog({ type: "err", cn: active.name, text: `${t.lg.noSkill}: "${target}"`, cIdx: aIdx }); return; }
+        skillVal = active.skills[key];
+        skillName = key;
+      }
+
+      const roll = resolveRoll(bp);
+      const level = getLevel(roll.result, skillVal);
+      setLastRolls(prev => ({ ...prev, [active.id]: { sv: skillVal, sn: skillName, bp, level, pushed: false } }));
+
+      const hard = Math.floor(skillVal / 2);
+      const ext = Math.floor(skillVal / 5);
+      const thresholds = `[${skillVal}/${hard}/${ext}]`;
+      const bpLabel = bp > 0 ? ` B×${bp}` : bp < 0 ? ` P×${Math.abs(bp)}` : "";
+
+      addLog({
+        type: "roll", cn: active.name, cIdx: aIdx,
+        text: `${t.lg.rolled} ${skillName}${thresholds}${bpLabel}: `,
+        roll: { ...roll, level },
+        suffix: ` — ${LS[level].i} ${t.lv[level]}`,
+      });
+      return;
+    }
+
+    // IC message
+    if (active) addLog({ type: "ic", cn: active.name, text: raw, cIdx: aIdx });
+    else addLog({ type: "ooc", cn: null, text: raw });
   }
+
   function exportLog() {
-    const text = log.map(e => `[${e.time}]${e.cn ? " " + e.cn + ":" : ""} ${e.text}`).join("\n");
+    const text = log.map(e => {
+      const p = `[${e.time}]${e.cn ? " " + e.cn + ":" : ""} `;
+      if (e.type === "roll") return p + e.text + e.roll.result + e.suffix;
+      return p + e.text;
+    }).join("\n");
     const b = new Blob([text], { type: "text/plain" });
-    const u = URL.createObjectURL(b);
-    const a = document.createElement("a"); a.href = u;
-    a.download = `coc7e-log-${new Date().toISOString().slice(0, 10)}.txt`;
+    const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u;
+    a.download = `coc7e-session-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click(); URL.revokeObjectURL(u);
   }
 
   /* ═══════════ RENDER ═══════════ */
   return (
-    <div style={{ minHeight: "100vh", background: P.bg, color: P.t, fontFamily: "'Crimson Text',serif", fontSize: 15 }}>
+    <div style={{ minHeight: "100vh", background: P.bg, color: P.t, fontFamily: "'Crimson Text',serif", fontSize: 15, display: "flex", flexDirection: "column" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
-        *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:5px}
-        ::-webkit-scrollbar-track{background:${P.bg}}
-        ::-webkit-scrollbar-thumb{background:${P.b};border-radius:3px}
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:${P.bg}}::-webkit-scrollbar-thumb{background:${P.b};border-radius:3px}
         input:focus,textarea:focus{border-color:${P.acd}!important}
-        button:hover{filter:brightness(1.15)}
-        button:active{transform:scale(.97)}
+        button:hover{filter:brightness(1.15)}button:active{transform:scale(.97)}
         input[type=number]::-webkit-inner-spin-button{opacity:.3}
       `}</style>
 
-      {/* ═══ HEADER ═══ */}
-      <header style={{
-        padding: "12px 18px", display: "flex", alignItems: "center", justifyContent: "space-between",
-        borderBottom: `1px solid ${P.b}`, background: "linear-gradient(180deg,#131311,#0d0d0b)",
-      }}>
+      {/* HEADER */}
+      <header style={{ padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${P.b}`, background: "linear-gradient(180deg,#131311,#0d0d0b)", flexShrink: 0 }}>
         <div>
-          <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: P.ac, margin: 0, letterSpacing: ".06em" }}>
-            {t.title}
-          </h1>
+          <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 17, fontWeight: 700, color: P.ac, letterSpacing: ".06em" }}>{t.title}</h1>
           <div style={{ fontSize: 11, color: P.td, fontStyle: "italic" }}>{t.subtitle}</div>
         </div>
-        <button onClick={() => setLang(l => l === "en" ? "zh" : "en")} style={{ ...btn, padding: "4px 12px", fontSize: 12 }}>
-          {t.langSwitch}
-        </button>
+        <button onClick={() => setLang(l => l === "en" ? "zh" : "en")} style={{ ...bt, padding: "4px 12px", fontSize: 12 }}>{t.langSwitch}</button>
       </header>
 
-      {/* ═══ ACTIVE CHAR STRIP ═══ */}
-      {active && tab !== "chars" && (
-        <div style={{
-          padding: "7px 18px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
-          background: P.s1, borderBottom: `1px solid ${P.b}`, fontSize: 13,
-        }}>
-          <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, color: P.ac, fontSize: 13 }}>{active.name}</span>
-          {[["hp", "HP", P.r], ["san", "SAN", P.bl2]].map(([k, l, c]) => (
-            <div key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <span style={{ color: c, fontFamily: "'Cinzel',serif", fontSize: 10 }}>{l}</span>
-              <button onClick={() => adjStat(active.id, k, -1)} style={{ background: "none", border: "none", color: P.r, cursor: "pointer", fontSize: 13, padding: "0 2px" }}>−</button>
-              <span style={{ color: P.tb, minWidth: 32, textAlign: "center" }}>{active[k]}/{active[k + "Max"]}</span>
-              <button onClick={() => adjStat(active.id, k, 1)} style={{ background: "none", border: "none", color: P.g, cursor: "pointer", fontSize: 13, padding: "0 2px" }}>+</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ═══ TABS ═══ */}
-      <nav style={{ display: "flex", borderBottom: `1px solid ${P.b}`, background: P.s1 }}>
-        {["chars", "dice", "log"].map(k => (
+      {/* TABS */}
+      <nav style={{ display: "flex", borderBottom: `1px solid ${P.b}`, background: P.s1, flexShrink: 0 }}>
+        {["chars", "session"].map(k => (
           <button key={k} onClick={() => setTab(k)} style={{
             flex: 1, padding: "9px 0", background: tab === k ? P.s2 : "transparent",
             border: "none", borderBottom: tab === k ? `2px solid ${P.ac}` : "2px solid transparent",
-            color: tab === k ? P.ac : P.td, fontFamily: "'Cinzel',serif",
-            fontSize: 12, cursor: "pointer", letterSpacing: ".07em", transition: "all 0.2s",
+            color: tab === k ? P.ac : P.td, fontFamily: "'Cinzel',serif", fontSize: 12, cursor: "pointer", letterSpacing: ".07em",
           }}>
             {t.tabs[k]}
-            {k === "log" && log.length > 0 && (
-              <span style={{ marginLeft: 5, fontSize: 9, color: P.td, background: P.s1, padding: "1px 5px", borderRadius: 8, border: `1px solid ${P.b}` }}>
-                {log.length}
-              </span>
-            )}
+            {k === "session" && log.length > 0 && <span style={{ marginLeft: 5, fontSize: 9, color: P.td, background: P.s1, padding: "1px 5px", borderRadius: 8, border: `1px solid ${P.b}` }}>{log.length}</span>}
           </button>
         ))}
       </nav>
 
-      {/* ═══ CONTENT ═══ */}
-      <div style={{ padding: 16, overflow: "auto" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* ════════ CHARACTERS ════════ */}
         {tab === "chars" && (
-          <div>
-            {chars.length === 0 && editing === null && (
-              <div style={{ textAlign: "center", color: P.td, padding: 36, fontStyle: "italic" }}>{t.cp.none}</div>
-            )}
-            {chars.map(c => editing === c.id ? null : (
+          <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+            {chars.length === 0 && editing === null && <div style={{ textAlign: "center", color: P.td, padding: 36, fontStyle: "italic" }}>{t.cp.none}</div>}
+            {chars.map((c, ci) => editing === c.id ? null : (
               <div key={c.id} onClick={() => setActiveId(c.id)} style={{
                 padding: 14, marginBottom: 10, borderRadius: 8,
                 background: activeId === c.id ? "linear-gradient(135deg,#191914,#1d1b13)" : P.s1,
-                border: `1px solid ${activeId === c.id ? P.acd : P.b}`,
-                cursor: "pointer", transition: "all 0.2s",
+                border: `1px solid ${activeId === c.id ? cc(ci) + "66" : P.b}`, cursor: "pointer",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 15, color: activeId === c.id ? P.ac : P.tb }}>
+                  <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 15, color: cc(ci) }}>
+                    <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: cc(ci), marginRight: 8, verticalAlign: "middle" }} />
                     {c.name}
                     {activeId === c.id && <span style={{ fontSize: 10, marginLeft: 8, color: P.td, fontWeight: 400 }}>▸ active</span>}
                   </span>
                   <div style={{ display: "flex", gap: 5 }}>
-                    <button onClick={e => { e.stopPropagation(); startEdit(c); }} style={{ ...btn, padding: "2px 9px", fontSize: 11 }}>{t.cp.edit}</button>
-                    <button onClick={e => { e.stopPropagation(); delChar(c.id); }} style={{ ...btn, padding: "2px 9px", fontSize: 11, color: P.r }}>{t.cp.del}</button>
+                    <button onClick={e => { e.stopPropagation(); startEdit(c); }} style={{ ...bt, padding: "2px 9px", fontSize: 11 }}>{t.cp.edit}</button>
+                    <button onClick={e => { e.stopPropagation(); delChar(c.id); }} style={{ ...bt, padding: "2px 9px", fontSize: 11, color: P.r }}>{t.cp.del}</button>
                   </div>
                 </div>
                 <Bar label="HP" cur={c.hp} max={c.hpMax} color={P.r} onAdj={d => adjStat(c.id, "hp", d)} />
@@ -472,14 +435,11 @@ export default function App() {
                       {n} <span style={{ color: P.tb }}>{v}</span>
                     </span>
                   ))}
-                  {Object.keys(c.skills).filter(k => c.skills[k] > 0).length > 10 && (
-                    <span style={{ fontSize: 11, color: P.td }}>+{Object.keys(c.skills).filter(k => c.skills[k] > 0).length - 10}</span>
-                  )}
+                  {Object.keys(c.skills).filter(k => c.skills[k] > 0).length > 10 && <span style={{ fontSize: 11, color: P.td }}>+{Object.keys(c.skills).filter(k => c.skills[k] > 0).length - 10}</span>}
                 </div>
               </div>
             ))}
 
-            {/* ── Form ── */}
             {editing !== null && (
               <div style={{ padding: 16, borderRadius: 8, background: P.s1, border: `1px solid ${P.acd}`, marginBottom: 10 }}>
                 <div style={{ marginBottom: 12 }}>
@@ -502,7 +462,6 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                {/* Skills */}
                 <label style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif" }}>{t.cp.skills}</label>
                 <div style={{ maxHeight: 180, overflow: "auto", marginTop: 5, display: "flex", flexDirection: "column", gap: 2 }}>
                   {Object.entries(fsk).map(([n, v]) => (
@@ -512,7 +471,7 @@ export default function App() {
                         onChange={e => setFsk(p => ({ ...p, [n]: Math.max(0, Math.min(99, +e.target.value)) }))}
                         style={{ ...inp, width: 52, textAlign: "center", padding: "2px 3px" }} />
                       <button onClick={() => setFsk(p => { const x = { ...p }; delete x[n]; return x; })}
-                        style={{ background: "none", border: "none", color: P.r, cursor: "pointer", fontSize: 13, padding: "0 3px" }}>✕</button>
+                        style={{ background: "none", border: "none", color: P.r, cursor: "pointer", fontSize: 13 }}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -520,195 +479,136 @@ export default function App() {
                   <input value={nsn} onChange={e => setNsn(e.target.value)} placeholder={lang === "zh" ? "技能名" : "Skill"} style={{ ...inp, flex: 1 }} />
                   <input type="number" value={nsv} onChange={e => setNsv(+e.target.value)} style={{ ...inp, width: 52, textAlign: "center" }} />
                   <button onClick={() => { if (nsn.trim()) { setFsk(p => ({ ...p, [nsn.trim()]: Math.max(0, Math.min(99, nsv)) })); setNsn(""); setNsv(10); } }}
-                    style={{ ...btn, padding: "5px 9px", fontSize: 11, color: P.g, whiteSpace: "nowrap" }}>{t.cp.addSkill}</button>
+                    style={{ ...bt, padding: "5px 9px", fontSize: 11, color: P.g, whiteSpace: "nowrap" }}>{t.cp.addSkill}</button>
                 </div>
                 <div style={{ display: "flex", gap: 7, marginTop: 14 }}>
-                  <button onClick={saveChar} style={{ ...abtn, flex: 1 }}>{t.cp.save}</button>
-                  <button onClick={() => setEditing(null)} style={{ ...btn, flex: 1 }}>{t.cp.cancel}</button>
+                  <button onClick={saveChar} style={{ ...abt, flex: 1 }}>{t.cp.save}</button>
+                  <button onClick={() => setEditing(null)} style={{ ...bt, flex: 1 }}>{t.cp.cancel}</button>
                 </div>
               </div>
             )}
-            {editing === null && (
-              <button onClick={startNew} style={{ ...abtn, width: "100%", marginTop: 6, padding: "10px 0" }}>{t.cp.add}</button>
-            )}
+            {editing === null && <button onClick={startNew} style={{ ...abt, width: "100%", marginTop: 6, padding: "10px 0" }}>{t.cp.add}</button>}
           </div>
         )}
 
-        {/* ════════ DICE ════════ */}
-        {tab === "dice" && (
-          <div style={{ maxWidth: 400, margin: "0 auto" }}>
-            {!active ? (
-              <div style={{ textAlign: "center", color: P.td, padding: 36, fontStyle: "italic" }}>{t.dp.pickChar}</div>
-            ) : (
-              <>
-                <label style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif", letterSpacing: ".05em" }}>{t.dp.pickSkill}</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 7, marginBottom: 14 }}>
-                  {Object.entries(active.skills).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([n, v]) => (
-                    <button key={n} onClick={() => { setSelSkill(n); resetRoll(); }} style={{
-                      ...btn, padding: "4px 9px", fontSize: 12,
-                      background: selSkill === n ? "linear-gradient(145deg,#2a2518,#1e1a10)" : P.s1,
-                      border: `1px solid ${selSkill === n ? P.acd : P.b}`,
-                      color: selSkill === n ? P.ac : P.t,
-                    }}>{n} <span style={{ color: P.td, marginLeft: 2 }}>{v}</span></button>
-                  ))}
-                  <button onClick={() => { setSelSkill("__custom__"); resetRoll(); }} style={{
-                    ...btn, padding: "4px 9px", fontSize: 12,
-                    background: selSkill === "__custom__" ? "linear-gradient(145deg,#2a2518,#1e1a10)" : P.s1,
-                    border: `1px solid ${selSkill === "__custom__" ? P.acd : P.b}`,
-                    color: selSkill === "__custom__" ? P.ac : P.t,
-                  }}>{t.dp.custom}</button>
-                </div>
-                {selSkill === "__custom__" && (
-                  <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                    <label style={{ fontSize: 12, color: P.td }}>{t.dp.value}:</label>
-                    <input type="number" value={customVal} min={1} max={100} onChange={e => setCustomVal(Math.max(1, Math.min(100, +e.target.value)))}
-                      style={{ ...inp, width: 60, textAlign: "center" }} />
-                  </div>
-                )}
-                {selSkill && (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 14 }}>
-                      <button onClick={() => { setBp(p => Math.max(-3, p - 1)); resetRoll(); }} style={{ ...btn, padding: "3px 11px", fontSize: 15, color: P.r }}>−</button>
-                      <span style={{ fontFamily: "'Cinzel',serif", fontSize: 12, color: P.td, minWidth: 100, textAlign: "center" }}>
-                        {bp === 0 ? "—" : bp > 0 ? `${t.dp.bonus} ×${bp}` : `${t.dp.penalty} ×${Math.abs(bp)}`}
-                      </span>
-                      <button onClick={() => { setBp(p => Math.min(3, p + 1)); resetRoll(); }} style={{ ...btn, padding: "3px 11px", fontSize: 15, color: P.g }}>+</button>
-                    </div>
-                    {(() => {
-                      const sv = selSkill === "__custom__" ? customVal : (active.skills[selSkill] ?? 50);
-                      return (
-                        <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 18, fontSize: 12, color: P.td }}>
-                          <span>{t.lg.regular} ≤ <span style={{ color: P.tb }}>{sv}</span></span>
-                          <span>{t.lg.hard} ≤ <span style={{ color: P.tb }}>{Math.floor(sv / 2)}</span></span>
-                          <span>{t.lg.extreme} ≤ <span style={{ color: P.tb }}>{Math.floor(sv / 5)}</span></span>
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-                <div style={{ minHeight: 110, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-                  {(animDice || rollRes) && (() => {
-                    const tensArr = animDice ? animDice.tens : rollRes.tens;
-                    const chV = animDice ? null : rollRes.chosen;
-                    const uV = animDice ? animDice.units : rollRes.units;
-                    return (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                        {tensArr.map((v, i) => {
-                          let ch = undefined;
-                          if (chV !== null && tensArr.length > 1) {
-                            ch = (i === tensArr.indexOf(chV) && v === chV) ? true : false;
-                          }
-                          return <Die key={`t${i}`} value={v} isTens={true} size={54} chosen={ch} />;
-                        })}
-                        <div style={{ width: 1, height: 36, background: P.b, margin: "0 3px" }} />
-                        <Die value={uV} isTens={false} size={54} />
-                      </div>
-                    );
-                  })()}
-                  {rollRes && !rolling && (() => {
-                    const ls = LS[rollRes.level];
-                    return (
-                      <div style={{
-                        marginTop: 16, padding: "10px 24px", borderRadius: 8,
-                        background: ls.bg, border: `1px solid ${ls.c}33`, textAlign: "center",
-                      }}>
-                        <div style={{ fontFamily: "'Cinzel',serif", fontSize: 26, fontWeight: 900, color: ls.c, letterSpacing: ".04em" }}>
-                          {ls.i} {rollRes.result}
-                        </div>
-                        <div style={{ fontSize: 13, color: ls.c, marginTop: 3, fontFamily: "'Cinzel',serif", fontWeight: 600, letterSpacing: ".06em" }}>
-                          {t.lv[rollRes.level]}
-                        </div>
-                        {rollRes.isPush && (
-                          <div style={{ fontSize: 11, color: P.td, marginTop: 3, fontStyle: "italic" }}>{t.lg.push}</div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-                {selSkill && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-                    {!rollRes && !rolling && (
-                      <button onClick={() => doRoll(false)} style={{ ...abtn, width: "100%", padding: "12px 0", fontSize: 15, fontWeight: 700, letterSpacing: ".07em" }}>
-                        {t.dp.roll}
-                      </button>
-                    )}
-                    {rolling && (
-                      <div style={{ fontFamily: "'Cinzel',serif", fontSize: 13, color: P.td, fontStyle: "italic", padding: 12 }}>
-                        {t.lg.rolling}
-                      </div>
-                    )}
-                    {rollRes && !rolling && (
-                      <>
-                        <div style={{ display: "flex", gap: 8, width: "100%" }}>
-                          <button onClick={resetRoll} style={{ ...btn, flex: 1, padding: "9px 0" }}>{t.dp.newRoll}</button>
-                          {canPush && (
-                            <button onClick={() => doRoll(true)} style={{
-                              ...btn, flex: 1, padding: "9px 0",
-                              background: "linear-gradient(145deg,#2a1818,#1e1010)",
-                              border: `1px solid ${P.r}55`, color: P.r,
-                            }}>{t.dp.push}</button>
-                          )}
-                        </div>
-                        {canPush && (
-                          <div style={{ fontSize: 11, color: P.r, fontStyle: "italic", opacity: .7 }}>{t.dp.pushWarn}</div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </>
+        {/* ════════ SESSION ════════ */}
+        {tab === "session" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {/* Character picker */}
+            {chars.length > 0 && (
+              <div style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", background: P.s1, borderBottom: `1px solid ${P.b}`, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif", marginRight: 2 }}>{t.sp.pickChar}:</span>
+                {chars.map((c, ci) => (
+                  <button key={c.id} onClick={() => { setActiveId(c.id); inputRef.current?.focus(); }}
+                    style={{
+                      ...bt, padding: "3px 9px", fontSize: 11,
+                      background: activeId === c.id ? `${cc(ci)}15` : P.s2,
+                      border: `1px solid ${activeId === c.id ? cc(ci) + "55" : P.b}`,
+                      color: activeId === c.id ? cc(ci) : P.t,
+                      display: "flex", alignItems: "center", gap: 4,
+                    }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: cc(ci), flexShrink: 0 }} />
+                    {c.name}
+                    <span style={{ fontSize: 9, color: P.td }}>{c.hp}/{c.hpMax}</span>
+                  </button>
+                ))}
+              </div>
             )}
-          </div>
-        )}
 
-        {/* ════════ LOG ════════ */}
-        {tab === "log" && (
-          <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 190px)" }}>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 8 }}>
-              {log.length > 0 && (
-                <>
-                  <button onClick={exportLog} style={{ ...btn, padding: "3px 10px", fontSize: 11 }}>{t.lp.export}</button>
-                  <button onClick={() => { if (window.confirm(t.lp.clearConfirm)) setLog([]); }}
-                    style={{ ...btn, padding: "3px 10px", fontSize: 11, color: P.r }}>{t.lp.clear}</button>
-                </>
-              )}
-            </div>
-            <div style={{ flex: 1, overflow: "auto", paddingRight: 3 }}>
-              {log.length === 0 && (
-                <div style={{ textAlign: "center", color: P.td, padding: 36, fontStyle: "italic" }}>{t.lp.empty}</div>
-              )}
+            {/* Active stat strip */}
+            {active && (
+              <div style={{ padding: "5px 16px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: P.s2, borderBottom: `1px solid ${P.b}`, flexShrink: 0, fontSize: 13 }}>
+                <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, color: cc(aIdx), fontSize: 13 }}>{active.name}</span>
+                {[["hp", "HP", P.r], ["san", "SAN", P.bl2]].map(([k, l, c]) => (
+                  <div key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    <span style={{ color: c, fontFamily: "'Cinzel',serif", fontSize: 10 }}>{l}</span>
+                    <button onClick={() => adjStat(active.id, k, -1)} style={{ background: "none", border: "none", color: P.r, cursor: "pointer", fontSize: 13, padding: "0 2px" }}>−</button>
+                    <span style={{ color: P.tb, minWidth: 32, textAlign: "center" }}>{active[k]}/{active[k + "Max"]}</span>
+                    <button onClick={() => adjStat(active.id, k, 1)} style={{ background: "none", border: "none", color: P.g, cursor: "pointer", fontSize: 13, padding: "0 2px" }}>+</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Log */}
+            <div style={{ flex: 1, overflow: "auto", padding: "10px 16px" }}>
+              {chars.length === 0 && <div style={{ textAlign: "center", color: P.td, padding: 36, fontStyle: "italic" }}>{t.sp.noChars}</div>}
+              {chars.length > 0 && log.length === 0 && <div style={{ textAlign: "center", color: P.td, padding: 36, fontStyle: "italic" }}>{t.sp.empty}</div>}
               {log.map(e => {
-                let icon = "📝", nc = P.ac, tc = P.t;
-                if (e.type === "roll") { icon = "🎲"; tc = e.detail ? LS[e.detail.level].c : P.t; }
-                else if (e.type === "hp") icon = "❤️";
+                const ci = e.cIdx ?? -1;
+                const nc = ci >= 0 ? cc(ci) : P.td;
+
+                if (e.type === "help") return (
+                  <div key={e.id} style={{ padding: "8px 10px", marginBottom: 4, borderRadius: 6, background: "rgba(201,168,76,0.06)", border: `1px solid ${P.acd}22`, fontFamily: "monospace", fontSize: 12, whiteSpace: "pre-wrap", color: P.td, lineHeight: 1.6 }}>{e.text}</div>
+                );
+                if (e.type === "err") return (
+                  <div key={e.id} style={{ padding: "4px 10px", marginBottom: 2, fontSize: 12, color: P.r, fontStyle: "italic" }}>
+                    <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>⚠ {e.cn && <span style={{ color: nc, fontFamily: "'Cinzel',serif", fontWeight: 600, fontSize: 11, marginRight: 4 }}>{e.cn}</span>}{e.text}
+                  </div>
+                );
+                if (e.type === "roll") {
+                  const ls = LS[e.roll.level];
+                  return (
+                    <div key={e.id} style={{ padding: "6px 10px", marginBottom: 3, borderRadius: 6, background: ls.bg, borderLeft: `3px solid ${ls.c}55`, fontSize: 13 }}>
+                      <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>
+                      <span style={{ marginRight: 3 }}>🎲</span>
+                      <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 600, color: nc, marginRight: 5, fontSize: 12 }}>{e.cn}</span>
+                      <span style={{ color: P.t }}>{e.text}</span>
+                      <DiceInline tens={e.roll.tens} chosen={e.roll.chosen} units={e.roll.units} />
+                      <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 700, fontSize: 16, color: ls.c, marginLeft: 2 }}>{e.roll.result}</span>
+                      <span style={{ color: ls.c, fontWeight: 600 }}>{e.suffix}</span>
+                    </div>
+                  );
+                }
+                if (e.type === "ic") return (
+                  <div key={e.id} style={{ padding: "5px 10px", marginBottom: 2, borderRadius: 5, borderLeft: `3px solid ${nc}33`, fontSize: 14 }}>
+                    <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>
+                    <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 600, color: nc, marginRight: 6, fontSize: 13 }}>{e.cn}</span>
+                    <span style={{ color: P.tb }}>{e.text}</span>
+                  </div>
+                );
+                if (e.type === "ooc") return (
+                  <div key={e.id} style={{ padding: "4px 10px", marginBottom: 2, borderRadius: 5, borderLeft: `3px solid ${P.td}33`, fontSize: 13, fontStyle: "italic" }}>
+                    <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>💬
+                    {e.cn && <span style={{ color: P.td, fontFamily: "'Cinzel',serif", fontWeight: 600, fontSize: 11, marginRight: 4, marginLeft: 3 }}>{e.cn}</span>}
+                    <span style={{ color: P.td }}>{e.text}</span>
+                  </div>
+                );
+                let icon = "⚙️";
+                if (e.type === "hp") icon = "❤️";
                 else if (e.type === "san") icon = "🧠";
                 else if (e.type === "skill") icon = "📖";
-                else if (e.type === "ooc") { icon = "💬"; nc = P.td; tc = P.td; }
-                else if (e.type === "sys") { icon = "⚙️"; nc = P.td; tc = P.td; }
-                else if (e.type === "msg") { icon = "💬"; }
                 return (
-                  <div key={e.id} style={{
-                    padding: "5px 9px", marginBottom: 2, borderRadius: 5,
-                    background: e.type === "roll" && e.detail ? LS[e.detail.level].bg : "transparent",
-                    borderLeft: `3px solid ${e.type === "roll" && e.detail ? LS[e.detail.level].c + "44" : e.type === "ooc" ? P.td + "44" : P.b}`,
-                    fontSize: 13,
-                  }}>
-                    <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>
-                    <span style={{ marginRight: 3 }}>{icon}</span>
-                    {e.cn && (
-                      <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 600, color: nc, marginRight: 5, fontSize: 12 }}>{e.cn}</span>
-                    )}
-                    <span style={{ color: tc }}>{e.text}</span>
+                  <div key={e.id} style={{ padding: "4px 10px", marginBottom: 2, borderRadius: 5, borderLeft: `3px solid ${P.b}`, fontSize: 12, color: P.td }}>
+                    <span style={{ fontSize: 10, marginRight: 5 }}>[{e.time}]</span>{icon}
+                    {e.cn && <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 600, color: nc, marginRight: 4, fontSize: 11, marginLeft: 3 }}>{e.cn}</span>}
+                    {e.text}
                   </div>
                 );
               })}
               <div ref={logEnd} />
             </div>
-            <form onSubmit={handleLogSub} style={{ display: "flex", gap: 6, marginTop: 8, flexShrink: 0 }}>
-              <input value={logIn} onChange={e => setLogIn(e.target.value)} placeholder={t.lp.placeholder}
-                style={{ ...inp, flex: 1, fontSize: 14 }} />
-              <button type="submit" style={{ ...abtn, padding: "6px 14px" }}>↵</button>
-            </form>
+
+            {/* Input */}
+            <div style={{ padding: "8px 16px 12px", borderTop: `1px solid ${P.b}`, background: P.s1, flexShrink: 0 }}>
+              {log.length > 0 && (
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 6 }}>
+                  <button onClick={exportLog} style={{ ...bt, padding: "2px 8px", fontSize: 10 }}>{t.sp.export}</button>
+                  <button onClick={() => { if (window.confirm(t.sp.clearConfirm)) setLog([]); }} style={{ ...bt, padding: "2px 8px", fontSize: 10, color: P.r }}>{t.sp.clear}</button>
+                </div>
+              )}
+              <form onSubmit={handleSubmit} style={{ display: "flex", gap: 6 }}>
+                {active && (
+                  <span style={{ display: "flex", alignItems: "center", padding: "0 8px", fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, color: cc(aIdx), whiteSpace: "nowrap" }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: cc(aIdx), marginRight: 5 }} />
+                    {active.name}
+                  </span>
+                )}
+                <input ref={inputRef} value={logIn} onChange={e => setLogIn(e.target.value)} placeholder={t.sp.inputPh}
+                  style={{ ...inp, flex: 1, fontSize: 14, borderRadius: 8 }} />
+                <button type="submit" style={{ ...abt, padding: "6px 14px", borderRadius: 8 }}>↵</button>
+              </form>
+            </div>
           </div>
         )}
       </div>
