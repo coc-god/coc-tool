@@ -1,8 +1,8 @@
 # 🐙 CoC 7e Session Playground / 克苏鲁的呼唤 7版 跑团场景
 
-A chat-driven session playground for **Call of Cthulhu 7th Edition** TRPG. Players pick characters, type commands to roll dice, and play through a shared session log. Full English and Chinese (中文) support.
+A chat-driven session playground for **Call of Cthulhu 7th Edition** TRPG with **multiplayer support via WebRTC**. The Keeper hosts a room, players join with a code — no server required. Full English and Chinese (中文) support.
 
-一个基于聊天指令的**克苏鲁的呼唤第七版** TRPG 跑团工具。玩家选择角色，通过输入指令掷骰，在共享的场景日志中进行游戏。支持中英文切换。
+一个基于聊天指令的**克苏鲁的呼唤第七版** TRPG 跑团工具，支持通过 **WebRTC 多人联机**。守密人创建房间，玩家通过房间代码加入——无需服务器。支持中英文切换。
 
 ## Features / 功能
 
@@ -18,11 +18,35 @@ Everything happens in the session chat. Type commands to roll, adjust stats, or 
 | `.push` | Push your last failed roll (孤注一掷) |
 | `.hp -3` / `.hp +2` | Adjust your HP |
 | `.san -5` / `.san +1` | Adjust your SAN |
+| `.gen <total>` | Generate 5 random attribute sets |
+| `.pick <1-5> [name]` | Create character from a generated set |
 | `.help` | Show command reference |
 | `(text)` | Out-of-character comment (OOC / 题外话) |
 | anything else | In-character message / narration |
 
 Dice rolls show inline tens + units dice with bonus/penalty dice visible, success thresholds `[regular/hard/extreme]`, and color-coded results.
+
+### 🌐 Multiplayer / 多人联机
+
+P2P multiplayer via [PeerJS](https://peerjs.com/) (WebRTC). The Keeper (KP) hosts a room, players join with a 4-character room code. No server needed — works directly on GitHub Pages.
+
+| Command | Effect |
+|---|---|
+| `.host [name]` | Host a room as Keeper (守密人) |
+| `.join <code> [name]` | Join a room as player (玩家) |
+| `.leave` | Disconnect from room |
+| `.scene <text>` | (KP) Set scene description for all players |
+| `.npc <name> [hp]` | (KP) Create an NPC |
+| `.secret <skill> [b/p]` | (KP) Secret roll — only you see the result |
+| `.lock` / `.unlock` | (KP) Lock/unlock player input |
+| `.adj <name> hp/san ±N` | (KP) Adjust any character's HP or SAN |
+
+**How it works:**
+- KP holds authoritative game state and broadcasts to all players
+- Players send commands to the KP for processing
+- Connection bar shows room code (click to copy), player list, and status
+- KP can manage NPCs, make secret rolls, set scenes, and lock player input
+- Secret rolls are filtered from the broadcast — only the KP sees them
 
 ### 👤 Characters / 角色管理
 - Create investigators with name, HP, SAN, and skills
@@ -68,6 +92,7 @@ Live at: `https://coc-god.github.io/coc-tool/`
 ## Tech Stack
 
 - React 19 + Vite
+- PeerJS (WebRTC) for multiplayer
 - Zero external UI dependencies
 - Cinzel + Crimson Text typography
 - Dark Lovecraftian theme 🕯️
