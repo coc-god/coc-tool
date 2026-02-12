@@ -1064,11 +1064,19 @@ export default function App() {
         {/* ════════ SESSION ════════ */}
         {tab === "session" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            {/* Character picker */}
-            {chars.length > 0 && (
+            {/* Character picker — filtered by ownership */}
+            {(() => {
+              const pickable = mp.mode === "player"
+                ? chars.filter(c => c.ownerId === mp.myPeerId)
+                : mp.mode === "host"
+                  ? chars.filter(c => !c.ownerId || c.ownerId === "kp")
+                  : chars;
+              return pickable.length > 0 && (
               <div style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", background: P.s1, borderBottom: `1px solid ${P.b}`, flexShrink: 0 }}>
                 <span style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif", marginRight: 2 }}>{t.sp.pickChar}:</span>
-                {chars.map((c, ci) => (
+                {pickable.map((c) => {
+                  const ci = chars.indexOf(c);
+                  return (
                   <button key={c.id} onClick={() => { setActiveId(c.id); inputRef.current?.focus(); }}
                     style={{
                       ...bt, padding: "3px 9px", fontSize: 11,
@@ -1082,9 +1090,11 @@ export default function App() {
                     {charBadgeInPicker(c)}
                     <span style={{ fontSize: 9, color: P.td }}>{c.hp}/{c.hpMax}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
-            )}
+              );
+            })()}
 
             {/* Scene display */}
             {mp.scene && (
