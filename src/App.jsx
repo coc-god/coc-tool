@@ -420,6 +420,14 @@ export default function App() {
   }, [chars, log, activeId, lang, lastRolls, loaded, mp.mode]);
   useEffect(() => { logEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [log]);
 
+  // ── Prevent KP accidentally closing session ──
+  useEffect(() => {
+    if (mp.mode !== "host") return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [mp.mode]);
+
   // ── Auto-broadcast (KP side) ──
   useEffect(() => {
     if (mp.mode !== "host") return;
@@ -595,9 +603,9 @@ export default function App() {
       return;
     }
 
-    // IC message
+    // IC message / narration
     if (char) addLog({ type: "ic", cn: char.name, text: raw, cIdx });
-    else addLog({ type: "ooc", cn: senderName || null, text: raw });
+    else addLog({ type: "ic", cn: senderName || (lang === "zh" ? "\u5B88\u5BC6\u4EBA" : "Keeper"), text: raw });
   }
 
   // ── Form handler (with multiplayer routing) ──
@@ -658,8 +666,9 @@ export default function App() {
       mp.sendCommand(raw, activeId, displayName || active?.name || "Player");
       // Show locally as pending IC for non-commands
       if (!raw.startsWith(".")) {
-        if (raw.startsWith("(")) addLog({ type: "ooc", cn: active?.name || displayName, text: raw, cIdx: aIdx });
-        else if (active) addLog({ type: "ic", cn: active.name, text: raw, cIdx: aIdx });
+        if (raw.startsWith("(")) addLog({ type: "ooc", cn: active?.name || displayName, text: raw, cIdx: aIdx, _local: true });
+        else if (active) addLog({ type: "ic", cn: active.name, text: raw, cIdx: aIdx, _local: true });
+        else addLog({ type: "ooc", cn: displayName || null, text: raw, _local: true });
       }
       return;
     }
@@ -1282,10 +1291,10 @@ export default function App() {
                 </div>
               )}
               <form onSubmit={handleSubmit} style={{ display: "flex", gap: 6 }}>
-                {active && (
-                  <span style={{ display: "flex", alignItems: "center", padding: "0 8px", fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, color: cc(aIdx), whiteSpace: "nowrap" }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: cc(aIdx), marginRight: 5 }} />
-                    {active.name}
+                {(active || mp.mode === "host") && (
+                  <span style={{ display: "flex", alignItems: "center", padding: "0 8px", fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, color: active ? cc(aIdx) : P.ac, whiteSpace: "nowrap" }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: active ? cc(aIdx) : P.ac, marginRight: 5 }} />
+                    {active ? active.name : (displayName || (lang === "zh" ? "\u5B88\u5BC6\u4EBA" : "Keeper"))}
                   </span>
                 )}
                 <input ref={inputRef} value={logIn} onChange={e => setLogIn(e.target.value)} placeholder={t.sp.inputPh}
