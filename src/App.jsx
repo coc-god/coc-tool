@@ -391,8 +391,15 @@ export default function App() {
     newCharRef.current(...args);
   }, []);
 
+  // ── Add log handler (KP receives log entries from player) ──
+  const handleAddLog = useCallback((entries) => {
+    if (Array.isArray(entries)) {
+      setLog(prev => [...prev, ...entries]);
+    }
+  }, []);
+
   // ── Multiplayer hook ──
-  const mp = useMultiplayer({ onStateSync: handleStateSync, onRemoteCommand: handleRemoteCommand, onNewChar: handleNewChar, addLog, t });
+  const mp = useMultiplayer({ onStateSync: handleStateSync, onRemoteCommand: handleRemoteCommand, onNewChar: handleNewChar, onAddLog: handleAddLog, addLog, t });
 
   useEffect(() => { const d = ld(); if (d) { d.chars && setChars(d.chars); d.log && setLog(d.log); d.activeId && setActiveId(d.activeId); d.lang && setLang(d.lang); d.lastRolls && setLastRolls(d.lastRolls); } setLoaded(true); }, []);
   useEffect(() => {
@@ -610,11 +617,14 @@ export default function App() {
         }
         const sets = genAttrSets(total, 5);
         setPendingSets({ total, sets });
-        addLog({ type: "gen", total, sets });
+        const genEntry = { id: uid(), time: now(), type: "gen", total, sets };
+        setLog(prev => [...prev, genEntry]);
+        // Send to KP so it persists in authoritative log
+        mp.sendLog([genEntry]);
         return;
       }
 
-      // .pick — handle locally + send new char to KP
+      // .pick — handle locally + send new char & log to KP
       const pickM = raw.match(/^\.pick\s+(\d+)(?:\s+(.+))?$/i);
       if (pickM) {
         if (!pendingSets) { addLog({ type: "err", text: t.lg.genNoPending }); return; }
@@ -628,10 +638,11 @@ export default function App() {
         setChars(p => [...p, charData]);
         setActiveId(id);
         setPendingSets(null);
-        addLog({ type: "pick", cn: name, idx, attrs: chosen });
-        addLog({ type: "sys", cn: name, text: t.lg.joined });
-        // Notify KP so char exists in authoritative state
+        const pickEntry = { id: uid(), time: now(), type: "pick", cn: name, idx, attrs: chosen };
+        setLog(prev => [...prev, pickEntry]);
+        // Notify KP so char + log exist in authoritative state
         mp.sendNewChar(charData);
+        mp.sendLog([pickEntry]);
         return;
       }
 
