@@ -379,8 +379,20 @@ export default function App() {
     remoteCommandRef.current(...args);
   }, []);
 
+  // ── New char handler (KP receives char created by player via .pick) ──
+  const newCharRef = useRef();
+  newCharRef.current = (charData, fromPeerId) => {
+    // Ensure ownerId matches sender
+    const safeChar = { ...charData, ownerId: fromPeerId };
+    setChars(p => [...p, safeChar]);
+    addLog({ type: "sys", cn: safeChar.name, text: t.lg.joined });
+  };
+  const handleNewChar = useCallback((...args) => {
+    newCharRef.current(...args);
+  }, []);
+
   // ── Multiplayer hook ──
-  const mp = useMultiplayer({ onStateSync: handleStateSync, onRemoteCommand: handleRemoteCommand, addLog, t });
+  const mp = useMultiplayer({ onStateSync: handleStateSync, onRemoteCommand: handleRemoteCommand, onNewChar: handleNewChar, addLog, t });
 
   useEffect(() => { const d = ld(); if (d) { d.chars && setChars(d.chars); d.log && setLog(d.log); d.activeId && setActiveId(d.activeId); d.lang && setLang(d.lang); d.lastRolls && setLastRolls(d.lastRolls); } setLoaded(true); }, []);
   useEffect(() => {
@@ -587,6 +599,42 @@ export default function App() {
       // Local-only commands
       if (raw.toLowerCase() === ".help") { addLog({ type: "help", text: t.help.title + "\n" + t.help.lines.join("\n") }); return; }
       if (raw.toLowerCase() === ".leave") { mp.leave(); return; }
+
+      // .gen — handle locally (pure randomness, no KP needed)
+      const genM = raw.match(/^\.gen\s+(\d+)$/i);
+      if (genM) {
+        const total = parseInt(genM[1], 10);
+        if (total < ATTR_MIN || total > ATTR_MAX || total % 5 !== 0) {
+          addLog({ type: "err", text: `${t.lg.genBadTotal}: ${total}. ${t.lg.genRange}` });
+          return;
+        }
+        const sets = genAttrSets(total, 5);
+        setPendingSets({ total, sets });
+        addLog({ type: "gen", total, sets });
+        return;
+      }
+
+      // .pick — handle locally + send new char to KP
+      const pickM = raw.match(/^\.pick\s+(\d+)(?:\s+(.+))?$/i);
+      if (pickM) {
+        if (!pendingSets) { addLog({ type: "err", text: t.lg.genNoPending }); return; }
+        const idx = parseInt(pickM[1], 10);
+        if (idx < 1 || idx > pendingSets.sets.length) { addLog({ type: "err", text: `${t.lg.genBadIdx}: ${idx}` }); return; }
+        const chosen = pendingSets.sets[idx - 1];
+        const name = (pickM[2] || "").trim() || (lang === "zh" ? "\u8C03\u67E5\u5458" : "Investigator");
+        const hp = Math.floor((chosen.CON + chosen.SIZ) / 10);
+        const id = uid();
+        const charData = { id, name, hp, hpMax: hp, san: chosen.POW, sanMax: 99, skills: { ...defaultSkills(lang) }, attrs: { ...chosen }, ownerId: mp.myPeerId };
+        setChars(p => [...p, charData]);
+        setActiveId(id);
+        setPendingSets(null);
+        addLog({ type: "pick", cn: name, idx, attrs: chosen });
+        addLog({ type: "sys", cn: name, text: t.lg.joined });
+        // Notify KP so char exists in authoritative state
+        mp.sendNewChar(charData);
+        return;
+      }
+
       // Locked?
       if (mp.locked) { addLog({ type: "err", text: t.lg.inputLocked }); return; }
       // Everything else goes to KP

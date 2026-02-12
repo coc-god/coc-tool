@@ -8,7 +8,7 @@ function randomCode() {
   return s;
 }
 
-export default function useMultiplayer({ onStateSync, onRemoteCommand, addLog, t }) {
+export default function useMultiplayer({ onStateSync, onRemoteCommand, onNewChar, addLog, t }) {
   const [mode, setMode] = useState("offline");       // "offline" | "host" | "player"
   const [roomCode, setRoomCode] = useState(null);
   const [myPeerId, setMyPeerId] = useState(null);
@@ -112,6 +112,10 @@ export default function useMultiplayer({ onStateSync, onRemoteCommand, addLog, t
               if (typeof onRemoteCommand === "function") {
                 onRemoteCommand(msg.text, conn.peer, msg.charId, msg.playerName);
               }
+            } else if (msg.type === "new-char") {
+              if (typeof onNewChar === "function") {
+                onNewChar(msg.char, conn.peer);
+              }
             } else if (msg.type === "heartbeat") {
               setPlayers(prev => {
                 const next = new Map(prev);
@@ -139,7 +143,7 @@ export default function useMultiplayer({ onStateSync, onRemoteCommand, addLog, t
       });
     };
     tryCreate(code);
-  }, [cleanup, addLog, t, onRemoteCommand]);
+  }, [cleanup, addLog, t, onRemoteCommand, onNewChar]);
 
   // ── JOIN ──
   const join = useCallback((code, name) => {
@@ -216,6 +220,14 @@ export default function useMultiplayer({ onStateSync, onRemoteCommand, addLog, t
     }
   }, []);
 
+  // ── SEND NEW CHAR (player → KP, for .pick) ──
+  const sendNewChar = useCallback((charData) => {
+    const conn = connsRef.current.get("host");
+    if (conn) {
+      try { conn.send({ type: "new-char", char: charData }); } catch {}
+    }
+  }, []);
+
   // ── BROADCAST STATE (KP → all players) ──
   const broadcastState = useCallback((payload) => {
     connsRef.current.forEach((conn) => {
@@ -245,6 +257,7 @@ export default function useMultiplayer({ onStateSync, onRemoteCommand, addLog, t
     join,
     leave,
     sendCommand,
+    sendNewChar,
     broadcastState,
     setScene,
     setLocked,
