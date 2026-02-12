@@ -456,8 +456,8 @@ export default function App() {
     if (mp.mode !== "host") return;
     if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
     broadcastTimerRef.current = setTimeout(() => {
-      // Filter secret entries from log before sending
-      const filteredLog = log.filter(e => e.type !== "secret");
+      // Filter secret and error entries from log before sending
+      const filteredLog = log.filter(e => e.type !== "secret" && e.type !== "err");
       const playersArr = [];
       mp.players.forEach((v, k) => playersArr.push({ peerId: k, ...v }));
       mp.broadcastState({
@@ -552,8 +552,8 @@ export default function App() {
       return;
     }
 
-    // Need char for remaining commands
-    if (raw.startsWith(".") && !char) { addLog({ type: "err", text: t.lg.noChar }); return; }
+    // Need char for stat/push/sc commands
+    if (/^\.(hp|san|push|sc)\b/i.test(raw) && !char) { addLog({ type: "err", text: t.lg.noChar }); return; }
 
     // .hp / .san
     const sm = raw.match(/^\.(hp|san)\s+([+-]?\d+)$/i);
@@ -624,7 +624,7 @@ export default function App() {
 
     // .rc <skill_or_number> [b<n>|p<n>]
     const rm = raw.match(/^\.rc\s+(.+?)(?:\s+([bp])(\d+))?$/i);
-    if (rm && char) {
+    if (rm) {
       const target = rm[1].trim();
       const bpType = rm[2]?.toLowerCase();
       const bpN = rm[3] ? Math.min(3, parseInt(rm[3], 10)) : 0;
@@ -634,7 +634,7 @@ export default function App() {
       if (/^\d+$/.test(target)) {
         skillVal = Math.max(1, Math.min(100, parseInt(target, 10)));
         skillName = lang === "zh" ? "\u81EA\u5B9A\u4E49" : "Custom";
-      } else {
+      } else if (char) {
         const key = Object.keys(char.skills).find(k => k.toLowerCase() === target.toLowerCase());
         if (key) {
           skillVal = char.skills[key];
@@ -648,11 +648,13 @@ export default function App() {
             addLog({ type: "err", cn: char.name, text: `${t.lg.noSkill}: "${target}"`, cIdx }); return;
           }
         }
+      } else {
+        addLog({ type: "err", text: t.lg.noChar }); return;
       }
 
       const roll = resolveRoll(bp);
       const level = getLevel(roll.result, skillVal);
-      setLastRolls(prev => ({ ...prev, [char.id]: { sv: skillVal, sn: skillName, bp, level, pushed: false } }));
+      if (char) setLastRolls(prev => ({ ...prev, [char.id]: { sv: skillVal, sn: skillName, bp, level, pushed: false } }));
 
       const hard = Math.floor(skillVal / 2);
       const ext = Math.floor(skillVal / 5);
@@ -660,7 +662,7 @@ export default function App() {
       const bpLabel = bp > 0 ? ` B\u00D7${bp}` : bp < 0 ? ` P\u00D7${Math.abs(bp)}` : "";
 
       addLog({
-        type: "roll", cn: char.name, cIdx,
+        type: "roll", cn: cn, cIdx,
         text: `${t.lg.rolled} ${skillName}${thresholds}${bpLabel}: `,
         roll: { ...roll, level },
         suffix: ` \u2014 ${LS[level].i} ${t.lv[level]}`,
@@ -783,7 +785,7 @@ export default function App() {
 
       // .secret <skill> [b<n>|p<n>]
       const secM = raw.match(/^\.secret\s+(.+?)(?:\s+([bp])(\d+))?$/i);
-      if (secM && active) {
+      if (secM) {
         const target = secM[1].trim();
         const bpType = secM[2]?.toLowerCase();
         const bpN = secM[3] ? Math.min(3, parseInt(secM[3], 10)) : 0;
@@ -793,7 +795,7 @@ export default function App() {
         if (/^\d+$/.test(target)) {
           skillVal = Math.max(1, Math.min(100, parseInt(target, 10)));
           skillName = lang === "zh" ? "\u81EA\u5B9A\u4E49" : "Custom";
-        } else {
+        } else if (active) {
           const key = Object.keys(active.skills).find(k => k.toLowerCase() === target.toLowerCase());
           if (key) { skillVal = active.skills[key]; skillName = key; }
           else {
@@ -801,6 +803,8 @@ export default function App() {
             if (attrDef && active.attrs) { skillVal = active.attrs[attrDef.key]; skillName = lang === "zh" ? attrDef.zh : attrDef.en; }
             else { addLog({ type: "err", cn: active.name, text: `${t.lg.noSkill}: "${target}"`, cIdx: aIdx }); return; }
           }
+        } else {
+          addLog({ type: "err", text: t.lg.noChar }); return;
         }
         const roll = resolveRoll(bp);
         const level = getLevel(roll.result, skillVal);
@@ -808,8 +812,9 @@ export default function App() {
         const ext = Math.floor(skillVal / 5);
         const thresholds = `[${skillVal}/${hard}/${ext}]`;
         const bpLabel = bp > 0 ? ` B\u00D7${bp}` : bp < 0 ? ` P\u00D7${Math.abs(bp)}` : "";
+        const secretCn = active ? active.name : (displayName || (lang === "zh" ? "KP" : "Keeper"));
         addLog({
-          type: "secret", cn: active.name, cIdx: aIdx,
+          type: "secret", cn: secretCn, cIdx: aIdx,
           text: `${t.lg.secretRoll} ${t.lg.rolled} ${skillName}${thresholds}${bpLabel}: `,
           roll: { ...roll, level },
           suffix: ` \u2014 ${LS[level].i} ${t.lv[level]}`,
