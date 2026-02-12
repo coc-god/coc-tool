@@ -30,6 +30,8 @@ const T = {
         ".push              — Push your last failed roll",
         ".hp -3  /  .hp +2  — Adjust your HP",
         ".san -5 / .san +1  — Adjust your SAN",
+        ".gen <total>       — Generate 5 random attribute sets",
+        ".pick <1-5> [name] — Create character from a generated set",
         "(text)             — Out-of-character comment",
         "anything else      — In-character message",
       ],
@@ -44,6 +46,10 @@ const T = {
       joined: "joined the session", removed: "left the session",
       a: "→", noSkill: "Skill not found", noChar: "Select a character first",
       pushFail: "Nothing to push", pushNone: "No previous failed roll to push",
+      gen: "Generated attribute sets", genTotal: "Total", genSet: "Set",
+      genPick: "Pick a set", genRange: "Total must be 210\u2013810 (multiple of 5)",
+      genBadTotal: "Invalid total", genNoPending: "No pending sets \u2014 use .gen first",
+      genBadIdx: "Invalid set number (1\u20135)", attrs: "Attributes",
     },
   },
   zh: {
@@ -74,6 +80,8 @@ const T = {
         ".push              — 孤注一掷（上次失败的检定）",
         ".hp -3  /  .hp +2  — 调整生命值",
         ".san -5 / .san +1  — 调整理智值",
+        ".gen <总数>        — 随机生成5组属性",
+        ".pick <1-5> [名字] — 从生成的属性组创建角色",
         "(文字)             — 题外话 / OOC",
         "其他文字            — 角色扮演 / 叙述",
       ],
@@ -88,6 +96,10 @@ const T = {
       joined: "加入了场景", removed: "离开了场景",
       a: "→", noSkill: "未找到该技能", noChar: "请先选择角色",
       pushFail: "没有可孤注一掷的检定", pushNone: "没有上次失败的检定可以孤注一掷",
+      gen: "已生成属性组", genTotal: "总数", genSet: "组",
+      genPick: "选择一组", genRange: "总数必须为210\u2013810（5的倍数）",
+      genBadTotal: "无效总数", genNoPending: "没有待选属性组——请先使用 .gen",
+      genBadIdx: "无效编号（1\u20135）", attrs: "属性",
     },
   },
 };
@@ -113,6 +125,50 @@ function defaultSkills(lang) {
   const o = {};
   SKILL_DEFAULTS.forEach(s => { o[s[lang]] = s.v; });
   return o;
+}
+
+/* ═══════════ Attributes ═══════════ */
+const ATTRS = [
+  { key: "STR", en: "STR", zh: "力量", min: 15, max: 90 },
+  { key: "CON", en: "CON", zh: "体质", min: 15, max: 90 },
+  { key: "SIZ", en: "SIZ", zh: "体型", min: 40, max: 90 },
+  { key: "DEX", en: "DEX", zh: "敏捷", min: 15, max: 90 },
+  { key: "APP", en: "APP", zh: "外貌", min: 15, max: 90 },
+  { key: "INT", en: "INT", zh: "智力", min: 40, max: 90 },
+  { key: "POW", en: "POW", zh: "意志", min: 15, max: 90 },
+  { key: "EDU", en: "EDU", zh: "教育", min: 40, max: 90 },
+  { key: "LCK", en: "LCK", zh: "幸运", min: 15, max: 90 },
+];
+const ATTR_MIN = ATTRS.reduce((s, a) => s + a.min, 0);
+const ATTR_MAX = ATTRS.reduce((s, a) => s + a.max, 0);
+
+function genAttrSet(total) {
+  const vals = ATTRS.map(a => a.min);
+  let remaining = total - ATTR_MIN;
+  const indices = ATTRS.map((_, i) => i);
+  let safety = 10000;
+  while (remaining > 0 && --safety > 0) {
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    let distributed = false;
+    for (const idx of indices) {
+      if (remaining <= 0) break;
+      const room = ATTRS[idx].max - vals[idx];
+      if (room >= 5) { vals[idx] += 5; remaining -= 5; distributed = true; }
+    }
+    if (!distributed) break;
+  }
+  const o = {};
+  ATTRS.forEach((a, i) => { o[a.key] = vals[i]; });
+  return o;
+}
+
+function genAttrSets(total, n) {
+  const sets = [];
+  for (let i = 0; i < n; i++) sets.push(genAttrSet(total));
+  return sets;
 }
 
 /* ═══════════ Dice ═══════════ */
@@ -237,11 +293,13 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [logIn, setLogIn] = useState("");
   const [lastRolls, setLastRolls] = useState({});
+  const [pendingSets, setPendingSets] = useState(null);
 
   const [editing, setEditing] = useState(null);
   const [fn, setFn] = useState(""); const [fhp, setFhp] = useState(10); const [fhpM, setFhpM] = useState(10);
   const [fsan, setFsan] = useState(50); const [fsanM, setFsanM] = useState(99);
   const [fsk, setFsk] = useState({}); const [nsn, setNsn] = useState(""); const [nsv, setNsv] = useState(10);
+  const [fAttrs, setFAttrs] = useState(null);
 
   const logEnd = useRef(null);
   const inputRef = useRef(null);
@@ -256,13 +314,13 @@ export default function App() {
   const addLog = useCallback((e) => setLog(prev => [...prev, { id: uid(), time: now(), ...e }]), []);
 
   // ── Char ops ──
-  function startNew() { setEditing("new"); setFn(""); setFhp(10); setFhpM(10); setFsan(50); setFsanM(99); setFsk({ ...defaultSkills(lang) }); }
-  function startEdit(c) { setEditing(c.id); setFn(c.name); setFhp(c.hp); setFhpM(c.hpMax); setFsan(c.san); setFsanM(c.sanMax); setFsk({ ...c.skills }); }
+  function startNew() { setEditing("new"); setFn(""); setFhp(10); setFhpM(10); setFsan(50); setFsanM(99); setFsk({ ...defaultSkills(lang) }); setFAttrs(null); }
+  function startEdit(c) { setEditing(c.id); setFn(c.name); setFhp(c.hp); setFhpM(c.hpMax); setFsan(c.san); setFsanM(c.sanMax); setFsk({ ...c.skills }); setFAttrs(c.attrs || null); }
   function saveChar() {
     if (!fn.trim()) return;
     if (editing === "new") {
       const id = uid();
-      setChars(p => [...p, { id, name: fn.trim(), hp: fhp, hpMax: fhpM, san: fsan, sanMax: fsanM, skills: { ...fsk } }]);
+      setChars(p => [...p, { id, name: fn.trim(), hp: fhp, hpMax: fhpM, san: fsan, sanMax: fsanM, skills: { ...fsk }, attrs: fAttrs }]);
       setActiveId(id);
       addLog({ type: "sys", cn: fn.trim(), text: t.lg.joined });
     } else {
@@ -271,7 +329,7 @@ export default function App() {
         Object.keys(fsk).forEach(sk => { if (c.skills[sk] !== undefined && c.skills[sk] !== fsk[sk]) addLog({ type: "skill", cn: c.name, text: `${sk} ${c.skills[sk]} ${t.lg.a} ${fsk[sk]}`, cIdx: chars.findIndex(x => x.id === c.id) }); });
         if (c.hp !== fhp || c.hpMax !== fhpM) addLog({ type: "hp", cn: c.name, text: `HP ${c.hp}/${c.hpMax} ${t.lg.a} ${fhp}/${fhpM}`, cIdx: chars.findIndex(x => x.id === c.id) });
         if (c.san !== fsan || c.sanMax !== fsanM) addLog({ type: "san", cn: c.name, text: `SAN ${c.san}/${c.sanMax} ${t.lg.a} ${fsan}/${fsanM}`, cIdx: chars.findIndex(x => x.id === c.id) });
-        return { ...c, name: fn.trim(), hp: fhp, hpMax: fhpM, san: fsan, sanMax: fsanM, skills: { ...fsk } };
+        return { ...c, name: fn.trim(), hp: fhp, hpMax: fhpM, san: fsan, sanMax: fsanM, skills: { ...fsk }, attrs: fAttrs };
       }));
     }
     setEditing(null);
@@ -297,6 +355,38 @@ export default function App() {
     if (raw.startsWith("(")) { addLog({ type: "ooc", cn: active?.name || null, text: raw, cIdx: aIdx }); return; }
     // .help
     if (raw.toLowerCase() === ".help") { addLog({ type: "help", text: t.help.title + "\n" + t.help.lines.join("\n") }); return; }
+    // .gen <total>
+    const genM = raw.match(/^\.gen\s+(\d+)$/i);
+    if (genM) {
+      const total = parseInt(genM[1], 10);
+      if (total < ATTR_MIN || total > ATTR_MAX || total % 5 !== 0) {
+        addLog({ type: "err", text: `${t.lg.genBadTotal}: ${total}. ${t.lg.genRange}` });
+        return;
+      }
+      const sets = genAttrSets(total, 5);
+      setPendingSets({ total, sets });
+      addLog({ type: "gen", total, sets });
+      return;
+    }
+
+    // .pick <1-5> [name]
+    const pickM = raw.match(/^\.pick\s+(\d+)(?:\s+(.+))?$/i);
+    if (pickM) {
+      if (!pendingSets) { addLog({ type: "err", text: t.lg.genNoPending }); return; }
+      const idx = parseInt(pickM[1], 10);
+      if (idx < 1 || idx > pendingSets.sets.length) { addLog({ type: "err", text: `${t.lg.genBadIdx}: ${idx}` }); return; }
+      const chosen = pendingSets.sets[idx - 1];
+      const name = (pickM[2] || "").trim() || (lang === "zh" ? "调查员" : "Investigator");
+      const hp = Math.floor((chosen.CON + chosen.SIZ) / 10);
+      const id = uid();
+      setChars(p => [...p, { id, name, hp, hpMax: hp, san: chosen.POW, sanMax: 99, skills: { ...defaultSkills(lang) }, attrs: { ...chosen } }]);
+      setActiveId(id);
+      setPendingSets(null);
+      addLog({ type: "pick", cn: name, idx, attrs: chosen });
+      addLog({ type: "sys", cn: name, text: t.lg.joined });
+      return;
+    }
+
     // Need char for commands
     if (raw.startsWith(".") && !active) { addLog({ type: "err", text: t.lg.noChar }); return; }
 
@@ -329,9 +419,18 @@ export default function App() {
         skillName = lang === "zh" ? "自定义" : "Custom";
       } else {
         const key = Object.keys(active.skills).find(k => k.toLowerCase() === target.toLowerCase());
-        if (!key) { addLog({ type: "err", cn: active.name, text: `${t.lg.noSkill}: "${target}"`, cIdx: aIdx }); return; }
-        skillVal = active.skills[key];
-        skillName = key;
+        if (key) {
+          skillVal = active.skills[key];
+          skillName = key;
+        } else {
+          const attrDef = ATTRS.find(a => a.key.toLowerCase() === target.toLowerCase() || a.en.toLowerCase() === target.toLowerCase() || a.zh === target);
+          if (attrDef && active.attrs) {
+            skillVal = active.attrs[attrDef.key];
+            skillName = lang === "zh" ? attrDef.zh : attrDef.en;
+          } else {
+            addLog({ type: "err", cn: active.name, text: `${t.lg.noSkill}: "${target}"`, cIdx: aIdx }); return;
+          }
+        }
       }
 
       const roll = resolveRoll(bp);
@@ -361,6 +460,8 @@ export default function App() {
     const text = log.map(e => {
       const p = `[${e.time}]${e.cn ? " " + e.cn + ":" : ""} `;
       if (e.type === "roll") return p + e.text + e.roll.result + e.suffix;
+      if (e.type === "gen") return `[${e.time}] ${t.lg.gen} (${t.lg.genTotal}: ${e.total})\n` + e.sets.map((s, i) => `  ${t.lg.genSet} ${i + 1}: ${ATTRS.map(a => `${a.key}=${s[a.key]}`).join(" ")}`).join("\n");
+      if (e.type === "pick") return `${p}${t.lg.genPick} #${e.idx}: ${ATTRS.map(a => `${a.key}=${e.attrs[a.key]}`).join(" ")}`;
       return p + e.text;
     }).join("\n");
     const b = new Blob([text], { type: "text/plain" });
@@ -429,6 +530,16 @@ export default function App() {
                 </div>
                 <Bar label="HP" cur={c.hp} max={c.hpMax} color={P.r} onAdj={d => adjStat(c.id, "hp", d)} />
                 <Bar label="SAN" cur={c.san} max={c.sanMax} color={P.bl2} onAdj={d => adjStat(c.id, "san", d)} />
+                {c.attrs && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 7, marginBottom: 4 }}>
+                    {ATTRS.map(a => (
+                      <span key={a.key} style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(201,168,76,0.08)", border: `1px solid ${P.acd}33`, color: P.td }}>
+                        <span style={{ fontFamily: "'Cinzel',serif", fontSize: 10 }}>{lang === "zh" ? a.zh : a.en}</span>{" "}
+                        <span style={{ color: P.ac }}>{c.attrs[a.key]}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 7 }}>
                   {Object.entries(c.skills).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([n, v]) => (
                     <span key={n} style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: P.s2, border: `1px solid ${P.b}`, color: P.td }}>
@@ -462,6 +573,34 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+                {fAttrs && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif" }}>{t.lg.attrs}</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 5 }}>
+                      {ATTRS.map(a => (
+                        <div key={a.key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <span style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif", minWidth: 28 }}>{lang === "zh" ? a.zh : a.en}</span>
+                          <input type="number" value={fAttrs[a.key]} min={a.min} max={a.max} step={5}
+                            onChange={e => {
+                              const v = Math.max(a.min, Math.min(a.max, +e.target.value));
+                              setFAttrs(p => {
+                                const next = { ...p, [a.key]: v };
+                                if (a.key === "CON" || a.key === "SIZ") {
+                                  const con = a.key === "CON" ? v : p.CON;
+                                  const siz = a.key === "SIZ" ? v : p.SIZ;
+                                  const newHp = Math.floor((con + siz) / 10);
+                                  setFhp(newHp); setFhpM(newHp);
+                                }
+                                if (a.key === "POW") { setFsan(v); }
+                                return next;
+                              });
+                            }}
+                            style={{ ...inp, flex: 1, textAlign: "center", padding: "2px 3px" }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <label style={{ fontSize: 11, color: P.td, fontFamily: "'Cinzel',serif" }}>{t.cp.skills}</label>
                 <div style={{ maxHeight: 180, overflow: "auto", marginTop: 5, display: "flex", flexDirection: "column", gap: 2 }}>
                   {Object.entries(fsk).map(([n, v]) => (
@@ -544,6 +683,44 @@ export default function App() {
                 if (e.type === "err") return (
                   <div key={e.id} style={{ padding: "4px 10px", marginBottom: 2, fontSize: 12, color: P.r, fontStyle: "italic" }}>
                     <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>⚠ {e.cn && <span style={{ color: nc, fontFamily: "'Cinzel',serif", fontWeight: 600, fontSize: 11, marginRight: 4 }}>{e.cn}</span>}{e.text}
+                  </div>
+                );
+                if (e.type === "gen") return (
+                  <div key={e.id} style={{ padding: "10px 12px", marginBottom: 4, borderRadius: 6, background: "rgba(201,168,76,0.06)", border: `1px solid ${P.acd}22` }}>
+                    <div style={{ fontSize: 12, color: P.ac, fontFamily: "'Cinzel',serif", fontWeight: 600, marginBottom: 6 }}>
+                      <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>
+                      🎲 {t.lg.gen} ({t.lg.genTotal}: {e.total})
+                    </div>
+                    {e.sets.map((s, si) => (
+                      <div key={si} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, padding: "3px 6px", borderRadius: 4, background: si % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent" }}>
+                        <span style={{ fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, color: P.ac, minWidth: 18 }}>{si + 1}.</span>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {ATTRS.map(a => (
+                            <span key={a.key} style={{ fontSize: 11, padding: "1px 5px", borderRadius: 3, background: P.s2, border: `1px solid ${P.b}`, color: P.td }}>
+                              <span style={{ fontFamily: "'Cinzel',serif", fontSize: 10 }}>{lang === "zh" ? a.zh : a.en}</span>{" "}
+                              <span style={{ color: P.tb }}>{s[a.key]}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 11, color: P.td, fontStyle: "italic", marginTop: 5 }}>{t.lg.genPick}: .pick &lt;1-5&gt; [name]</div>
+                  </div>
+                );
+                if (e.type === "pick") return (
+                  <div key={e.id} style={{ padding: "6px 10px", marginBottom: 3, borderRadius: 6, background: "rgba(90,186,122,0.06)", borderLeft: `3px solid ${P.g}55`, fontSize: 13 }}>
+                    <span style={{ color: P.td, fontSize: 10, marginRight: 5 }}>[{e.time}]</span>
+                    <span style={{ marginRight: 3 }}>✦</span>
+                    <span style={{ fontFamily: "'Cinzel',serif", fontWeight: 600, color: P.g, marginRight: 5, fontSize: 12 }}>{e.cn}</span>
+                    <span style={{ color: P.t }}>← {t.lg.genSet} #{e.idx}</span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                      {ATTRS.map(a => (
+                        <span key={a.key} style={{ fontSize: 11, padding: "1px 5px", borderRadius: 3, background: "rgba(201,168,76,0.08)", border: `1px solid ${P.acd}33`, color: P.td }}>
+                          <span style={{ fontFamily: "'Cinzel',serif", fontSize: 10 }}>{lang === "zh" ? a.zh : a.en}</span>{" "}
+                          <span style={{ color: P.ac }}>{e.attrs[a.key]}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 );
                 if (e.type === "roll") {
