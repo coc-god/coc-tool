@@ -354,8 +354,14 @@ export default function App() {
   // ── State sync handler (player receives from KP) ──
   const handleStateSync = useCallback((msg) => {
     setChars(msg.chars || []);
-    setLog(msg.log || []);
     setLastRolls(msg.lastRolls || {});
+    // Merge log: keep _local entries not already in KP's log, then combine
+    const kpLog = msg.log || [];
+    const kpIds = new Set(kpLog.map(e => e.id));
+    setLog(prev => {
+      const localKeep = prev.filter(e => e._local && !kpIds.has(e.id));
+      return [...kpLog, ...localKeep].sort((a, b) => Number(a.id) - Number(b.id));
+    });
     // Preserve activeId if char still exists, else auto-pick own char
     setActiveId(prev => {
       if (msg.chars?.some(c => c.id === prev)) return prev;
@@ -604,7 +610,7 @@ export default function App() {
     // ── Player mode ──
     if (mp.mode === "player") {
       // Local-only commands
-      if (raw.toLowerCase() === ".help") { addLog({ type: "help", text: t.help.title + "\n" + t.help.lines.join("\n") }); return; }
+      if (raw.toLowerCase() === ".help") { addLog({ type: "help", text: t.help.title + "\n" + t.help.lines.join("\n"), _local: true }); return; }
       if (raw.toLowerCase() === ".leave") { mp.leave(); return; }
 
       // .gen — handle locally (pure randomness, no KP needed)
@@ -612,12 +618,12 @@ export default function App() {
       if (genM) {
         const total = parseInt(genM[1], 10);
         if (total < ATTR_MIN || total > ATTR_MAX || total % 5 !== 0) {
-          addLog({ type: "err", text: `${t.lg.genBadTotal}: ${total}. ${t.lg.genRange}` });
+          addLog({ type: "err", text: `${t.lg.genBadTotal}: ${total}. ${t.lg.genRange}`, _local: true });
           return;
         }
         const sets = genAttrSets(total, 5);
         setPendingSets({ total, sets });
-        const genEntry = { id: uid(), time: now(), type: "gen", total, sets };
+        const genEntry = { id: uid(), time: now(), type: "gen", total, sets, _local: true };
         setLog(prev => [...prev, genEntry]);
         // Send to KP so it persists in authoritative log
         mp.sendLog([genEntry]);
@@ -627,9 +633,9 @@ export default function App() {
       // .pick — handle locally + send new char & log to KP
       const pickM = raw.match(/^\.pick\s+(\d+)(?:\s+(.+))?$/i);
       if (pickM) {
-        if (!pendingSets) { addLog({ type: "err", text: t.lg.genNoPending }); return; }
+        if (!pendingSets) { addLog({ type: "err", text: t.lg.genNoPending, _local: true }); return; }
         const idx = parseInt(pickM[1], 10);
-        if (idx < 1 || idx > pendingSets.sets.length) { addLog({ type: "err", text: `${t.lg.genBadIdx}: ${idx}` }); return; }
+        if (idx < 1 || idx > pendingSets.sets.length) { addLog({ type: "err", text: `${t.lg.genBadIdx}: ${idx}`, _local: true }); return; }
         const chosen = pendingSets.sets[idx - 1];
         const name = (pickM[2] || "").trim() || (lang === "zh" ? "\u8C03\u67E5\u5458" : "Investigator");
         const hp = Math.floor((chosen.CON + chosen.SIZ) / 10);
@@ -638,7 +644,7 @@ export default function App() {
         setChars(p => [...p, charData]);
         setActiveId(id);
         setPendingSets(null);
-        const pickEntry = { id: uid(), time: now(), type: "pick", cn: name, idx, attrs: chosen };
+        const pickEntry = { id: uid(), time: now(), type: "pick", cn: name, idx, attrs: chosen, _local: true };
         setLog(prev => [...prev, pickEntry]);
         // Notify KP so char + log exist in authoritative state
         mp.sendNewChar(charData);
@@ -647,7 +653,7 @@ export default function App() {
       }
 
       // Locked?
-      if (mp.locked) { addLog({ type: "err", text: t.lg.inputLocked }); return; }
+      if (mp.locked) { addLog({ type: "err", text: t.lg.inputLocked, _local: true }); return; }
       // Everything else goes to KP
       mp.sendCommand(raw, activeId, displayName || active?.name || "Player");
       // Show locally as pending IC for non-commands
